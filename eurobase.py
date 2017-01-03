@@ -199,9 +199,6 @@ class Request(object):
                 html = self.__read_from_file(pathname)
             return html
     
-            
-            
-    #/************************************************************************/
     """
     class _defaultErrorHandler(urllib2.HTTPDefaultErrorHandler):
         def http_error_default(self, req, fp, code, msg, headers):
@@ -401,49 +398,10 @@ class Request(object):
             try:    msg=msg['error']['label']
             except: pass
         return status, msg
-    
-    #/************************************************************************/
-    @classmethod
-    def make_soup(cls, html, **kwargs):
-        """
-        
-            >>> soup = Requests.make_soup(html)
-            
-        Arguments
-        ---------
-
-        Returns
-        -------
-
-        Raises
-        ------
-
-        Note
-        ----
-                
-        Examples
-        --------
-        >>> 
-        
-        See also
-        --------
-        """
-        parser = kwargs.get('kwargs','html.parser') 
-        if parser not in ('html.parser','html5lib','lxml'):
-            raise EurobaseError('unknown soup parser')
-        ## urllib2 variant
-        # html = response.read()
-        try:
-            raw = bs4.BeautifulSoup(html, parser)
-            #raw = bs4.BeautifulSoup(html, parser).get_text()
-        except:
-            # raise EurobaseError('impossible to read HTML page') 
-            raw = None
-        return raw
        
     #/************************************************************************/
     @classmethod
-    def fetch_html_table(cls, soup, **kwargs): # read vegetables
+    def read_html_table(cls, html, **kwargs): # read vegetables
         """
         
             >>> 
@@ -470,10 +428,20 @@ class Request(object):
         See also
         --------
         """
+        parser = kwargs.get('kwargs','html.parser') 
+        if parser not in ('html.parser','html5lib','lxml'):
+            raise EurobaseError('unknown soup parser')
+        ## urllib2 variant
+        # html = response.read()
         try:
-            tables = soup.findAll('table', **kwargs)
+            raw = bs4.BeautifulSoup(html, parser)
+            #raw = bs4.BeautifulSoup(html, parser).get_text()
         except:
-            raise EurobaseError('wrong soup')
+            raise EurobaseError('impossible to read HTML page') 
+        try:
+            tables = raw.findAll('table', **kwargs)
+        except:
+            raise EurobaseError('error with soup from HTML page')
         headers, rows = [], []
         for table in tables:
             try:
@@ -488,7 +456,7 @@ class Request(object):
        
     #/************************************************************************/
     @classmethod
-    def read_url_table(cls, session, url, **kwargs): 
+    def load_url_table(cls, session, url, **kwargs): 
         status = cls.get_status(session, url)
         names = kwargs.pop('names')
         df=pd.read_table(url, encoding=str, skip_blank_lines=True, memory_map=True,
@@ -513,11 +481,11 @@ class Collections(object):
     
     #/************************************************************************/
     def __init__(self, **kwargs):
-        self.__session      = requests.session()
-        self.__metabase     = None
-        # set default values
+        self.__session      = None
         self.__url          = None
         self.__status       = None
+        self.__metabase     = None
+        # set default values
         self.__domain       = BULK_DOMAIN
         self.__lang         = DEF_LANG
         self.__query        = BULK_QUERY
@@ -587,7 +555,7 @@ class Collections(object):
     def datasets(self, datasets):
         if not isinstance(datasets, (dict, list, tuple)):
             raise EurobaseError('wrong type for datasets parameter')
-        elif isinstance(dimensions, (list, tuple)):
+        elif isinstance(datasets, (list, tuple)):
             datasets = {'_all_': datasets}
         self.__datasets = datasets # not an update!
 
@@ -602,14 +570,12 @@ class Collections(object):
         self.__cache = os.path.abspath(cache)
 
     #/************************************************************************/
-    @property
-    def session(self):
-        return self.__session
  
     #/************************************************************************/
-    @staticmethod
-    def _build_url(domain, **kwargs):
-        """Create the query URL to *Bulk download* web service.
+
+    #/************************************************************************/
+    def setURL(self, **kwargs):
+        """Set the query URL to *Bulk download* web service.
         
             >>> url = Collections._build_url(domain, **kwargs)
            
@@ -635,9 +601,24 @@ class Collections(object):
         # DATA_URL        = 'ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&dir=data'
     
         """
+        [kwargs.update({attr: kwargs.get(attr) or getattr(self, '{}'.format(attr))})
+            for attr in ('domain','query','lang')]
+        self.__url=self.__build_url(**kwargs)
+    def getURL(self, **kwargs):
+        # update/merge passed arguments with already existing ones
+        [kwargs.update({attr: kwargs.get(attr) or getattr(self, '{}'.format(attr))})
+            for attr in ('domain','query','lang')]
+        # actually return
+        return self.__build_url(**kwargs) or self.__url
+    @property
+    def url(self):
+        #if self._url is None:   self.setURL()
+        return self.__url
+    @staticmethod
+    def __build_url(domain, **kwargs):
         if kwargs == {}:
             return None
-        elif not('domain' in kwargs and 'query' in kwargs):
+        elif not('domain' in kwargs):
             raise EurobaseError('uncomplete information for building URL')
         # set parameters
         if 'lang' in kwargs:  
@@ -651,27 +632,22 @@ class Collections(object):
         if not isinstance(sort,int):
             raise EurobaseError('wrong parameter value for sort')            
         kwargs.update({'sort':sort}) 
-        url = Requests.build_url(**kwargs)
+        url = Request.build_url(**kwargs)
         if lang is not None:
             url = "{url}/{lang}".format(url=url,lang=lang)
         return url
-    def setURL(self, **kwargs):
-        [kwargs.update({attr: kwargs.get(attr) or getattr(self, '__{}'.format(attr))})
-            for attr in ('domain','query','ext','lang')]
-        self.__url=self._build_url(**kwargs)
-    def getURL(self, **kwargs):
-        # update/merge passed arguments with already existing ones
-        [kwargs.update({attr: kwargs.get(attr) or getattr(self, '__{}'.format(attr))})
-            for attr in ('domain','query','ext','lang')]
-        # actually return
-        return self._build_url(**kwargs) or self.__url
-    @property
-    def url(self):
-        #if self._url is None:   self.setURL()
-        return self.__url
-    
+        
     #/************************************************************************/
-    def download(self, url, **kwargs, filename=None, expire_after=None):
+    def setSession(self, **kwargs):
+        self.__session = requests.session(**kwargs)
+    def getSession(self, **kwargs):
+        return requests.session(**kwargs) or self.__session
+    @property
+    def session(self):
+        return self.__session
+
+    #/************************************************************************/
+    def fetch(self, url, filename=None, expire_after=None, **kwargs):
         """Download url from internet.
         Store the downloaded content into <cache_dir>/file.
         If <cache_dir>/file exists, it returns content from disk
@@ -702,11 +678,10 @@ class Collections(object):
 
     #/************************************************************************/
     @staticmethod
-    def __fecth_members(html):
+    def __read_members(html):
         if html is None or html == '':
             return None
-        soup = Requests.make_soup(html)
-        headers, rows = Requests.fetch_html_table(soup, attrs={'class':'filelist'})
+        headers, rows = Request.read_html_table(html, attrs={'class':'filelist'})
         #_, rows = Requests.fetch_tables(soup,class_='filelist')
         rows = rows[0] # only one table in the page
         data, i = [], 0
@@ -731,7 +706,7 @@ class Collections(object):
         #kwargs.update({'file': self.BULK_FILE})
         #url = self.getURL(**kwargs)
         url = '{url}&file={fil}'.format(url=url, fil=BULK_DIC_FILE)
-        data = self._find_members(url)
+        data = self.__read_members(url)
         dimensions = [d.replace('.{ext}'.format(ext=BULK_DIC_EXT),'') for d in data]
         return dimensions
      
@@ -752,7 +727,7 @@ class Collections(object):
             #kwargs.update({'dir': self.BULK_DIR, 'start': a})
             #url = self.getURL(**kwargs)
             url = '{url}&dir={dire}&start={alpha}'.format(url=url, dire=BULK_DATA_DIR, alpha=a)
-            data = self._find_members(url)
+            data = self.__read_members(url)
             datasets[a] = [d.replace('.{ext}'.format(ext=BULK_DATA_EXT),'') for d in data]
             #all_datasets.append(datasets[a])
         return datasets #all_datasets
