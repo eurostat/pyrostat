@@ -59,7 +59,7 @@ metadata = dict([
 
 import os, sys 
 import inspect, warnings
-import string, re
+import string, re, time
 import operator, itertools, collections
 
     
@@ -94,7 +94,17 @@ else:
 try:
     import pandas as pd
 except ImportError:          
-    pass
+    class pandas:
+        def read_table(*args, **kwargs): 
+            raise IOError
+
+try:                                
+    import datetime
+except ImportError:          
+    class datetime:
+        class timedelta: 
+            pass
+
 
 try: # Python doesn't pickle method instance by default
     import pickle, cPickle #analysis:ignore   
@@ -164,40 +174,6 @@ class Request(object):
     """
     """
     
-    #/************************************************************************/
-    class Downloader:
-        def __init__(self, cache="./data", expire_after=None):
-            """initialize downloader
-            :param cache_dir: directory where to store downloaded files
-            :param time_to_live: how many seconds to store file on disk, None is infinity, 0 for not to store
-            """
-            self.__cache = os.path.abspath(cache)
-            self.__expire_after = expire_after
-    
-            self.__session = requests.session()
-   
-        def download(self, url, filename=None, expire_after=None):
-            """Download url from internet.
-            Store the downloaded content into <cache_dir>/file.
-            If <cache_dir>/file exists, it returns content from disk
-            :param url: page to be downloaded
-            :param filename: filename where to store the content of url, None if we want not store
-            :param time_to_live: how many seconds to store file on disk,
-                                 None use default time_to_live,
-                                 0 don't use cached version if any
-            :returns: the content of url (str type)
-            """
-    
-            pathname = self.__build_pathname(filename, url)
-            # note: html must be a str type not byte type
-            if expire_after == 0 or not self.__is_cached(pathname):
-                response = self.__session.get(url)
-                response.raise_for_status()
-                html = response.text
-                self.__write_page_to_cache(pathname, html)
-            else:
-                html = self.__read_from_file(pathname)
-            return html
     
     """
     class _defaultErrorHandler(urllib2.HTTPDefaultErrorHandler):
@@ -249,8 +225,6 @@ class Request(object):
         Example: 
             http://ec.europa.eu/eurostat/wdds/rest/data/v2.1/json/en/ilc_li03?precision=1&indic_il=LI_R_MD60&time=2015
         """
-        if domain is None or domain == '':
-            raise EurobaseError('uncomplete information for building URL')
         # retrieve parameters/build url
         url = domain.strip("/")
         if 'protocol' in kwargs:    protocol = kwargs.pop('protocol')
@@ -277,18 +251,6 @@ class Request(object):
             # filters = '&'.join(map("=".join,kwargs.items()))
             url = "{url}?{filters}".format(url=url, filters=filters)
         return url
-            
-    #/************************************************************************/
-    @classmethod
-    def build_pathname(cls, url, **kwargs):
-        pathname = url.encode('utf-8')
-        try:
-            pathname = hashlib.md5(pathname).hexdigest()
-        except:
-            pathname = pathname.hex()
-        if 'dirname' in kwargs:
-            pathname = os.path.join(kwargs.get('dirname'), pathname)
-        return pathname
     
     #/************************************************************************/
     @classmethod
@@ -477,10 +439,13 @@ class Collections(object):
     http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?dir=data&sort=1&start=a
     http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=metabase.txt.gz
     """
-        
     
     #/************************************************************************/
     def __init__(self, **kwargs):
+        """
+        :param cache: directory where to store downloaded files
+        :param expire: how many seconds to store file on disk, None is infinity, 0 for not to store
+        """
         self.__session      = None
         self.__url          = None
         self.__status       = None
@@ -492,16 +457,19 @@ class Collections(object):
         self.__dimensions   = []
         self.__datasets     = dict([(a, []) for a in list(string.ascii_lowercase)])
         self.__cache        = None
+        self.__expire       = 0 # datetime.deltatime(0)
+        self.__force_download   = False
         # check whether any argument is passed
         if kwargs == {}:
             return
         # update
-        try:
-            [setattr(self, '{}'.format(attr), kwargs.pop(attr))                         \
-                 for attr in ('domain','query','lang','dimensions','datasets','cache')  \
-                 if attr in kwargs]
-        except: 
-            pass
+        attrs = ( 'domain','query','lang','expire','force_download',     \
+                              'dimensions','datasets','cache' )
+        for attr in list(set(attrs).intersection(kwargs.keys())):
+            try:
+                setattr(self, '{}'.format(attr), kwargs.pop(attr))
+            except: 
+                warnings.warn(EurobaseWarning('wrong attribute value {}'.format(attr.upper())))
         
     #/************************************************************************/
     @property
@@ -510,7 +478,7 @@ class Collections(object):
     @domain.setter
     def domain(self, domain):
         if not isinstance(domain, str):
-            raise EurobaseError('wrong type for domain parameter')
+            raise EurobaseError('wrong type for DOMAIN parameter')
         self.__domain = domain
 
     #/************************************************************************/
@@ -520,7 +488,7 @@ class Collections(object):
     @query.setter
     def query(self, query):
         if not isinstance(query, str):
-            raise EurobaseError('wrong type for query parameter')
+            raise EurobaseError('wrong type for QUERY parameter')
         self.__query = query
 
     #/************************************************************************/
@@ -530,7 +498,7 @@ class Collections(object):
     @lang.setter
     def lang(self, lang):
         if not isinstance(lang, str):
-            raise EurobaseError('wrong type for lang parameter')
+            raise EurobaseError('wrong type for LANG parameter')
         elif not lang in LANGS:
             raise EurobaseError('language not supported')
         self.__lang = lang
@@ -542,7 +510,7 @@ class Collections(object):
     @dimensions.setter
     def dimensions(self, dimensions):
         if not isinstance(dimensions, (str,list,tuple)):
-            raise EurobaseError('wrong type for dimensions parameter')
+            raise EurobaseError('wrong type for DIMENSIONS parameter')
         elif isinstance(dimensions, str):
             dimensions = [dimensions]
         self.__dimensions = dimensions
@@ -554,7 +522,7 @@ class Collections(object):
     @datasets.setter
     def datasets(self, datasets):
         if not isinstance(datasets, (dict, list, tuple)):
-            raise EurobaseError('wrong type for datasets parameter')
+            raise EurobaseError('wrong type for DATASETS parameter')
         elif isinstance(datasets, (list, tuple)):
             datasets = {'_all_': datasets}
         self.__datasets = datasets # not an update!
@@ -566,12 +534,30 @@ class Collections(object):
     @cache.setter
     def cache(self, cache):
         if not isinstance(cache, str):
-            raise EurobaseError('wrong type for cache parameter')
+            raise EurobaseError('wrong type for CACHE parameter')
         self.__cache = os.path.abspath(cache)
 
     #/************************************************************************/
- 
+    @property
+    def expire(self):
+        return self.__expire
+    @expire.setter
+    def expire(self, expire):
+        if not isinstance(expire, (int, datetime.timedelta)):
+            raise EurobaseError('wrong type for EXPIRE parameter')
+        elif isinstance(expire, int) and expire<0:
+            raise EurobaseError('wrong setting for EXPIRE parameter')
+        self.__expire = expire
+
     #/************************************************************************/
+    @property
+    def force_download(self):
+        return self.__force_download
+    @force_download.setter
+    def force_download(self, force_download):
+        if not isinstance(force_download, bool):
+            raise EurobaseError('wrong type for FORCE_DOWNLOAD parameter')
+        self.__force_download = force_download
 
     #/************************************************************************/
     def setURL(self, **kwargs):
@@ -615,12 +601,13 @@ class Collections(object):
         #if self._url is None:   self.setURL()
         return self.__url
     @staticmethod
-    def __build_url(domain, **kwargs):
+    def __build_url(**kwargs):
         if kwargs == {}:
             return None
         elif not('domain' in kwargs):
             raise EurobaseError('uncomplete information for building URL')
         # set parameters
+        domain = kwargs.pop('domain')
         if 'lang' in kwargs:  
             lang = kwargs.pop('lang')
         else:
@@ -632,7 +619,7 @@ class Collections(object):
         if not isinstance(sort,int):
             raise EurobaseError('wrong parameter value for sort')            
         kwargs.update({'sort':sort}) 
-        url = Request.build_url(**kwargs)
+        url = Request.build_url(domain, **kwargs)
         if lang is not None:
             url = "{url}/{lang}".format(url=url,lang=lang)
         return url
@@ -647,7 +634,47 @@ class Collections(object):
         return self.__session
 
     #/************************************************************************/
-    def fetch(self, url, filename=None, expire_after=None, **kwargs):
+    def is_cached(self, url):
+        """check if url exists
+        :param url:
+        :returns: True if the file can be retrieved from the disk (cache)
+        """
+        pathname = self.__build_pathname(url, dirname=self.__cache)
+        return self.__is_cached(pathname, expire=self.__expire)
+    @staticmethod
+    def __is_cached(pathname, expire=0):
+        if not os.path.exists(pathname):
+            return False
+        elif expire is None or expire==0:
+            return True
+        else:
+            cur = time.time()
+            mtime = os.stat(pathname).st_mtime
+            # print("last modified: %s" % time.ctime(mtime))
+            return cur - mtime < expire
+            
+    #/************************************************************************/
+    @staticmethod
+    def __build_pathname(filename, dirname=None):
+        pathname = filename.encode('utf-8')
+        try:
+            pathname = hashlib.md5(pathname).hexdigest()
+        except:
+            pathname = pathname.hex()
+        if dirname is not None and dirname != '':
+            pathname = os.path.join(dirname, pathname)
+        return pathname
+        
+    #/************************************************************************/
+    def get_members(self, url, **kwargs):
+        pathname = self.__build_pathname(url, dirname=self.__cache)
+        # update/merge passed arguments with already existing ones
+        [kwargs.update({attr: kwargs.get(attr) or getattr(self, '{}'.format(attr))})
+            for attr in ('force_download','expire')]
+        # actually return
+        return self.__get_members(pathname, **kwargs)
+    @staticmethod
+    def __get_members(url, pathname, **kwargs):
         """Download url from internet.
         Store the downloaded content into <cache_dir>/file.
         If <cache_dir>/file exists, it returns content from disk
@@ -658,17 +685,15 @@ class Collections(object):
                                  0 don't use cached version if any
         :returns: the content of url (str type)
         """
-        
-        if filename in kwargs:
-            pathname = self.__build_pathname(filename, url)
-    
-            # create cache directory only the fist time it is needed
-            if not os.path.exists(self.__cache):
-                os.makedirs(self.__cache)
-            if not os.path.isdir(self.__cache):
-                raise EurobaseError('cache {} is not a directory'.format(self.__cache))
-            # note: html must be a str type not byte type
-            if expire_after == 0 or not self.__is_cached(pathname):
+        force_download = kwargs.get('force_download',False)
+        expire = kwargs.get('expire', 0)
+        # create cache directory only the fist time it is needed
+        if not os.path.exists(self.__cache):
+            os.makedirs(self.__cache)
+        if not os.path.isdir(self.__cache):
+            raise EurobaseError('cache {} is not a directory'.format(self.__cache))
+        # note: html must be a str type not byte type
+        if force_download is True or expire == 0 or not self.__is_cached(pathname):
                 response = cls.get_response(self.__session, url)
                 html = response.text
                 self.__write_to_cache(pathname, html)
@@ -698,20 +723,19 @@ class Collections(object):
             return data    
             
     #/************************************************************************/
-    def fetch_dimensions(self, **kwargs):
-        if self.url is not None:
-            url = self.url
-        else:
-            url = self.getURL(**kwargs)
+    def find_dimensions(self, **kwargs):
+        if kwargs == {}:    url = self.url
+        else:               url = self.get_url(**kwargs)
         #kwargs.update({'file': self.BULK_FILE})
         #url = self.getURL(**kwargs)
         url = '{url}&file={fil}'.format(url=url, fil=BULK_DIC_FILE)
-        data = self.__read_members(url)
+        html = self.__get_members(url)
+        data = self.__read_members(html)
         dimensions = [d.replace('.{ext}'.format(ext=BULK_DIC_EXT),'') for d in data]
         return dimensions
      
     #/************************************************************************/
-    def fetch_datasets(self, alpha=None, **kwargs):
+    def find_datasets(self, alpha=None, **kwargs):
         if alpha is None:
             alpha = list(string.ascii_lowercase)
         elif not alpha in list(string.ascii_lowercase):
@@ -719,23 +743,16 @@ class Collections(object):
         else:
             alpha = list(alpha)
         datasets = {} # all_datasets = []
+        if kwargs == {}:    url = self.url
+        else:               url = self.get_url(**kwargs)
         for a in alpha:
-            if self.url is not None:
-                url = self.url
-            else:
-                url = self.getURL(**kwargs)
-            #kwargs.update({'dir': self.BULK_DIR, 'start': a})
-            #url = self.getURL(**kwargs)
-            url = '{url}&dir={dire}&start={alpha}'.format(url=url, dire=BULK_DATA_DIR, alpha=a)
-            data = self.__read_members(url)
+            urla = '{url}&dir={dire}&start={alpha}'.format(url=url, dire=BULK_DATA_DIR, alpha=a)
+            html = self.__get_members(urla)
+            data = self.__read_members(html)
             datasets[a] = [d.replace('.{ext}'.format(ext=BULK_DATA_EXT),'') for d in data]
             #all_datasets.append(datasets[a])
         return datasets #all_datasets
             
-    def setMembers(self):
-        self.__members = self.find_all() #self._find_members(self._url)
-    def getMembers(self, url=''):
-        return self._find_members(url) or self.__members
     @property
     def members(self):
         #if self._members is None:   self.setMembers()
@@ -756,23 +773,10 @@ class Collections(object):
             return True
         else:                       
             return False
-    def checkMember(self, member):
-        return self._check_member(member, self.__members)
-
-    def is_cached(self, pathname):
-        """check if pathname exists
-        :param pathname:
-        :returns: True if the file can be retrieved from the disk (cache)
-        """
-        if not os.path.exists(pathname):
-            return False
-        if self.__expire_after is None:
-            return True
-    
-        cur = time.time()
-        mtime = os.stat(pathname).st_mtime
-        # print("last modified: %s" % time.ctime(mtime))
-        return cur - mtime < self.__expire_after
+    def check_dimensions(self, dimension):
+        return self.__check_member(dimension, self.dimensions)
+    def check_datasets(self, dataset):
+        return self.__check_member(dataset, self.datasets)
     
     @staticmethod
     def __write_to_cache(pathname, content):
@@ -847,12 +851,12 @@ class API(object):
         if kwargs == {}:
             return
         # update
-        try:
-            [setattr(self, attr, kwargs.pop(attr))                              \
-                for attr in ('domain','dataset','filters','fmt','lang','vers','force_check') \
-                 if attr in kwargs]
-        except: 
-            pass
+        attrs = ('domain','dataset','filters','fmt','lang','vers','force_check') 
+        for attr in list(set(attrs).intersection(kwargs.keys())):
+            try:
+                setattr(self, '{}'.format(attr), kwargs.pop(attr))
+            except: 
+                warnings.warn(EurobaseWarning('wrong attribute value {}'.format(attr.upper())))
 
     #/************************************************************************/
     def __call__(self, **kwargs):
