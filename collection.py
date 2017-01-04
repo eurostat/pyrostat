@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-.. collections.py
+.. collection.py
 
 Basic class for dimensions/datasets definitions
 

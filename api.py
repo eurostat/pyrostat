@@ -37,23 +37,6 @@ Tools for Eurostat data collections upload
 
 
 #==============================================================================
-# PROGRAM METADATA
-#==============================================================================
-
-metadata = dict([
-                ('project', 'EuroBase'),
-                ('date', 'Wed Dec  7 23:52:39 2016'),
-                ('url', 'https://github.com/gjacopo/eurobase'),
-                ('organization', 'European Union'),
-                ('license', 'European Union Public Licence (EUPL)'),
-                ('version', '0.1'),
-                ('description', 'Tools for data collections upload from Eurostat website'),
-                ('credits',  ['grazzja']),
-                ('contact', 'jacopo.grazzini@ec.europa.eu'),
-                ])
-
-
-#==============================================================================
 # IMPORT STATEMENTS
 #==============================================================================
 

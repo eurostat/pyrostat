@@ -65,6 +65,18 @@ except ImportError:
 else:
     pass
 
+try:                                
+    import datetime
+except ImportError:          
+    class datetime:
+        class timedelta: 
+            pass
+    
+try:
+    import hashlib
+except:
+    pass    
+
 try:
     import pandas as pd
 except ImportError:          
