@@ -345,22 +345,12 @@ class Session(object):
         return status, msg
             
     #/************************************************************************/
-    @staticmethod
-    def __build_pathname(cls, filename, dirname=None):
-        pathname = filename.encode('utf-8')
-        try:
-            pathname = hashlib.md5(pathname).hexdigest()
-        except:
-            pathname = pathname.hex()
-        if dirname is not None and dirname != '':
-            pathname = os.path.join(dirname, pathname)
-        return pathname
                         
     #/************************************************************************/
-    def fetch_html(self, url, pathname, cache=None, expire=0, force_donwload=False):
+    def load_page(self, url, **kwargs):
         """Download url from internet.
-        Store the downloaded content into <cache_dir>/file.
-        If <cache_dir>/file exists, it returns content from disk
+        Store the downloaded content into <cache>/file.
+        If <cache>/file exists, it returns content from disk
         :param url: page to be downloaded
         :param filename: filename where to store the content of url, None if we want not store
         :param time_to_live: how many seconds to store file on disk,
@@ -369,50 +359,78 @@ class Session(object):
         :returns: the content of url (str type)
         """
         # create cache directory only the fist time it is needed
-        if not os.path.exists(cache):
-            os.makedirs(cache)
-        if not os.path.isdir(cache):
-            raise EurobaseError('cache {} is not a directory'.format(cache))
         # note: html must be a str type not byte type
-        if force_download is True or expire == 0 or not cls.is_cached(pathname):
+        cache = kwargs.get('cache') or self.cache or None
+        expire = kwargs.get('cache') or self.expire or 0
+        force_download = kwargs.get('force_download') or self.force_download or False
+        pathname = self.__build_pathname(url, cache)
+        if force_download or not self.__is_cached(pathname, expire):
             response = self.__session.get_response(url)
             html = response.text
-            self.write_to_cache(pathname, html)
+            if cache is not None:
+                if not os.path.exists(cache):
+                    os.makedirs(cache)
+                elif not os.path.isdir(cache):
+                    raise EurobaseError('cache {} is not a directory'.format(cache))
+                self.__write_to_cache(pathname, html)
         else:
-            html = self.read_from_cache(pathname)
+            if not os.path.exists(cache) or not os.path.isdir(cache):
+                raise EurobaseError('cache {} is not a directory'.format(cache))
+            html = self.__read_from_cache(pathname)
         return html
-    
-    #/************************************************************************/
-    def write_to_cache(self, pathname, content):
+    @staticmethod
+    def __build_pathname(url, cache):
+        pathname = url.encode('utf-8')
+        try:
+            pathname = hashlib.md5(pathname).hexdigest()
+        except:
+            pathname = pathname.hex()
+        if cache is not None:
+            pathname = os.path.join(cache, pathname)
+        return pathname
+    @staticmethod
+    def __write_to_cache(pathname, content):
         """write content to pathname
         :param pathname:
         :param content:
         """
-        f = open(pathname, 'w')
-        f.write(content)
-        f.close()
-    
-    def read_from_cache(self, pathname):
+        with open(pathname, 'w') as f:
+            f.write(content)
+            f.close()  
+        return
+    @staticmethod
+    def __read_from_cache(pathname):
         """it reads content from pathname
         :param pathname:
         """
-        f = open(pathname, 'r')
-        content = f.read()
-        f.close()
+        with open(pathname, 'r') as f:
+            content = f.read()
+            f.close()
         return content
-        
-    #/************************************************************************/
-    def is_cached(self, pathname, expire=0):
+    @staticmethod
+    def __is_cached(pathname, expire):
         if not os.path.exists(pathname):
-            return False
-        elif expire is None or expire==0:
-            return True
+            resp = False
+        elif expire is 0:
+            resp = False
+        elif expire is None:
+            resp = True
         else:
             cur = time.time()
             mtime = os.stat(pathname).st_mtime
             # print("last modified: %s" % time.ctime(mtime))
-            return cur - mtime < expire
-       
+            resp = cur - mtime < expire
+        return resp
+
+    #/************************************************************************/
+    def is_cached(self, url):
+        """check if url exists
+        :param url:
+        :returns: True if the file can be retrieved from the disk (cache)
+        """
+        pathname = self.__build_pathname(url, dirname=self.__cache)
+        return self.__is_cached(pathname, expire=self.__expire)
+        
     #/************************************************************************/
     @classmethod
     def read_html_table(cls, html, **kwargs): # read vegetables
@@ -469,9 +487,8 @@ class Session(object):
         
        
     #/************************************************************************/
-    @classmethod
-    def load_url_table(cls, session, url, **kwargs): 
-        status = cls.get_status(session, url)
+    def load_file_table(self, url, **kwargs): 
+        status = self.get_status(url)
         names = kwargs.pop('names')
         df=pd.read_table(url, encoding=str, skip_blank_lines=True, memory_map=True,
                              error_bad_lines=False, warn_bad_lines=True, **kwargs)

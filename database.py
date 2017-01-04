@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 """
-.. collection.py
+.. database.py
 
-Basic class for dimensions/datasets definitions
+Basic class for online database (dimensions+datasets) definitions
 
 **About**
 
@@ -54,7 +54,7 @@ from .session import Session
 #==============================================================================
     
 
-class Collection(object):
+class Database(object):
     """
     http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=dic/en/net_seg10.dic    
     http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=dic/en/dimlist.dic    
@@ -231,17 +231,8 @@ class Collection(object):
         return session or self.__session
     @property
     def session(self):
-        return self.__session
-
-    #/************************************************************************/
-    def is_cached(self, url):
-        """check if url exists
-        :param url:
-        :returns: True if the file can be retrieved from the disk (cache)
-        """
-        pathname = self.__build_pathname(url, dirname=self.__cache)
-        return self.__is_cached(pathname, expire=self.__expire)
-        
+        return self.__session,session
+       
     #/************************************************************************/
     def get_members(self, url, **kwargs):
         pathname = self.__build_pathname(url, dirname=self.__cache)

@@ -75,7 +75,7 @@ class EurobaseWarning(Warning):
 
 import settings
 from .session import Session
-from .collection import Collection
+from .database import Database
 
 #==============================================================================
 # CLASSES/METHODS
