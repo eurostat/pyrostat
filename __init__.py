@@ -24,7 +24,7 @@ Tools for Eurostat data collections upload
 """
 
 
-__all__ = ['settings', 'session', 'collection', 'api']#analysis:ignore
+__all__ = ['settings', 'session', 'bulkdata', 'api']#analysis:ignore
 
 #==============================================================================
 # PROGRAM METADATA

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-.. database.py
+.. bulkdata.py
 
 Basic class for online database (dimensions+datasets) definitions
 
@@ -56,7 +56,7 @@ from .session import Session
 #==============================================================================
     
 
-class Collection(object):
+class Bulkdata(object):
     """
     http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=dic/en/net_seg10.dic    
     http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=dic/en/dimlist.dic    

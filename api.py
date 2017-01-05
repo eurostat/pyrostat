@@ -63,7 +63,7 @@ from functools import reduce
 from . import EurobaseWarning, EurobaseError
 from . import settings
 from .session import Session
-from .collection import Collection
+from .bulkdata import Bulkdata
 
 #==============================================================================
 # CLASSES/METHODS
