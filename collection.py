@@ -35,18 +35,20 @@ Basic class for online database (dimensions+datasets) definitions
 """
 
 
-    
-try:                                
-    import requests # urllib2
-except ImportError:                 
-    raise IOError
+#==============================================================================
+# IMPORT STATEMENTS
+#==============================================================================
+
+import warnings
+import string
 
 try:                                
     import lxml
 except ImportError:                 
     pass
 
-from .settings import *
+from . import EurobaseWarning, EurobaseError
+from . import settings
 from .session import Session
 
 #==============================================================================
@@ -54,7 +56,7 @@ from .session import Session
 #==============================================================================
     
 
-class Database(object):
+class Collection(object):
     """
     http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=dic/en/net_seg10.dic    
     http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=dic/en/dimlist.dic    
@@ -79,17 +81,17 @@ class Database(object):
         self.__status       = None
         self.__metabase     = None
         # set default values
-        self.__domain       = BULK_DOMAIN
-        self.__lang         = DEF_LANG
-        self.__query        = BULK_QUERY
+        self.__domain       = settings.BULK_DOMAIN
+        self.__lang         = settings.DEF_LANG
+        self.__sort         = settings.DEF_SORT
+        self.__query        = settings.BULK_QUERY
         self.__dimensions   = []
         self.__datasets     = dict([(a, []) for a in list(string.ascii_lowercase)])
         # check whether any argument is passed
         if kwargs == {}:
             return
         # update
-        attrs = ( 'domain','query','lang','expire','force_download',     \
-                              'dimensions','datasets','cache' )
+        attrs = ( 'domain','query','lang','sort','dimensions','datasets' )
         for attr in list(set(attrs).intersection(kwargs.keys())):
             try:
                 setattr(self, '{}'.format(attr), kwargs.pop(attr))
@@ -124,9 +126,21 @@ class Database(object):
     def lang(self, lang):
         if not isinstance(lang, str):
             raise EurobaseError('wrong type for LANG parameter')
-        elif not lang in LANGS:
+        elif not lang in settings.LANGS:
             raise EurobaseError('language not supported')
         self.__lang = lang
+
+    #/************************************************************************/
+    @property
+    def sort(self):
+        return self.__sort
+    @sort.setter
+    def sort(self, sort):
+        if not isinstance(sort, int):
+            raise EurobaseError('wrong type for SORT parameter')
+        elif not sort > 0:
+            raise EurobaseError('wrong value for SORT parameter')
+        self.__sort = sort
 
     #/************************************************************************/
     @property
@@ -151,6 +165,24 @@ class Database(object):
         elif isinstance(datasets, (list, tuple)):
             datasets = {'_all_': datasets}
         self.__datasets = datasets # not an update!
+
+        
+    #/************************************************************************/
+    def setSession(self, **kwargs):
+        try:
+            self.__session = Session(**kwargs)
+        except:
+            raise EurobaseError('wrong definition for SESSION parameter')
+    def getSession(self, **kwargs):
+        try:
+            session = Session(**kwargs)
+        except:
+            session = None
+            pass
+        return session or self.__session
+    @property
+    def session(self):
+        return self.__session #.session
 
     #/************************************************************************/
     def setURL(self, **kwargs):
@@ -180,75 +212,75 @@ class Database(object):
         # DATA_URL        = 'ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&dir=data'
     
         """
+        if 'lang' in  kwargs:   kwargs.pop('lang')
         [kwargs.update({attr: kwargs.get(attr) or getattr(self, '{}'.format(attr))})
-            for attr in ('domain','query','lang')]
-        self.__url=self.__build_url(**kwargs)
+            for attr in ('query','sort')]
+        self.__url=Session.build_url(self.domain, **kwargs)
     def getURL(self, **kwargs):
         # update/merge passed arguments with already existing ones
+        if 'lang' in  kwargs:   kwargs.pop('lang')
         [kwargs.update({attr: kwargs.get(attr) or getattr(self, '{}'.format(attr))})
-            for attr in ('domain','query','lang')]
+            for attr in set(('query','sort')).intersection(set(kwargs.keys()))]
         # actually return
-        return self.__build_url(**kwargs) or self.__url
+        return Session.build_url(self.domain, **kwargs) or self.url
     @property
     def url(self):
         #if self._url is None:   self.setURL()
         return self.__url
-    @staticmethod
-    def __build_url(**kwargs):
-        if kwargs == {}:
-            return None
-        elif not('domain' in kwargs):
-            raise EurobaseError('uncomplete information for building URL')
-        # set parameters
-        domain = kwargs.pop('domain')
-        if 'lang' in kwargs:  
-            lang = kwargs.pop('lang')
+            
+    #/************************************************************************/
+    def bulk_dimensions(self, **kwargs):
+        if 'ext' in kwargs:     ext = kwargs.pop('ext')
+        else:                   ext = settings.BULK_DIC_EXT
+        if 'dir' in kwargs:     dire = kwargs.pop('dir')
+        else:                   dire = settings.BULK_DIC_FILE
+        url = self.__complete_url(self.url, lang=self.lang, dir=dire)
+        html = self.session.load_page(url, **kwargs)
+        if html is None or html == '':
+            raise EurobaseError('no HTML content found') 
+        _, rows = self.session.read_html_table(html, attrs={'class':'filelist'})
+        data = self.__filter_table(rows)
+        dimensions = [d.replace('.{ext}'.format(ext=ext),'') for d in data]
+        return dimensions
+    def bulk_datasets(self, alpha=None, **kwargs):
+        if alpha is None:
+            alpha = list(string.ascii_lowercase)
+        elif not alpha in list(string.ascii_lowercase):
+            raise EurobaseError('unrecognised parameter alpha')
         else:
-            lang = None
-        if lang not in LANGS:
+            alpha = list(alpha)
+        datasets = {} # all_datasets = []
+        if 'ext' in kwargs:     ext = kwargs.pop('ext')
+        else:                   ext = settings.BULK_DATA_EXT
+        if 'dir' in kwargs:     dire = kwargs.pop('dir')
+        else:                   dire = settings.BULK_DATA_DIR
+        #url = '{url}&dir={dire}'.format(url=url, dire=dire)
+        url = self.__complete_url(self.url, dir=dire)
+        for a in alpha:
+            urla = '{url}&start={alpha}'.format(url=url, alpha=a)
+            html = self.session.load_page(urla, **kwargs)
+            if html is None or html == '':
+                raise EurobaseError('no HTML content found') 
+            _, rows = self.session.read_html_table(html, attrs={'class':'filelist'})
+            data = self.__filter_table(rows)
+            datasets[a] = [d.replace('.{}'.format(ext),'') for d in data]
+            #all_datasets.append(datasets[a])
+        return datasets #all_datasets
+    @staticmethod
+    def __complete_url(domain, **kwargs):
+        if kwargs == {}:
+            return domain
+        # set parameters
+        if 'lang' in kwargs:    lang = kwargs.pop('lang')
+        else:                   lang = None
+        if lang is not None and lang not in settings.LANGS:
             raise EurobaseError('language not supported')
-        if 'sort' in kwargs:    sort = kwargs.pop('sort')
-        else:                   sort = 1    
-        if not isinstance(sort,int):
-            raise EurobaseError('wrong parameter value for sort')            
-        kwargs.update({'sort':sort}) 
         url = Session.build_url(domain, **kwargs)
         if lang is not None:
             url = "{url}/{lang}".format(url=url,lang=lang)
         return url
-        
-    #/************************************************************************/
-    def setSession(self, **kwargs):
-        try:
-            self.__session = Session(**kwargs)
-        except:
-            self.__session = requests.session(**kwargs)
-    def getSession(self, **kwargs):
-        try:
-            session = Session(**kwargs)
-        except:
-            session = requests.session(**kwargs)
-        return session or self.__session
-    @property
-    def session(self):
-        return self.__session,session
-       
-    #/************************************************************************/
-    def get_members(self, url, **kwargs):
-        pathname = self.__build_pathname(url, dirname=self.__cache)
-        # update/merge passed arguments with already existing ones
-        [kwargs.update({attr: kwargs.get(attr) or getattr(self, '{}'.format(attr))})
-            for attr in ('force_download','expire')]
-        # actually return
-        return self.__get_members(pathname, **kwargs)
-
-    #/************************************************************************/
     @staticmethod
-    def __read_members(html):
-        if html is None or html == '':
-            return None
-        headers, rows = Request.read_html_table(html, attrs={'class':'filelist'})
-        #_, rows = Requests.fetch_tables(soup,class_='filelist')
+    def __filter_table(rows):
         rows = rows[0] # only one table in the page
         data, i = [], 0
         for row in rows:
@@ -257,81 +289,43 @@ class Database(object):
                 cols = row.find_all("td")
             except:
                 cols = row.findAll("td")
-            if cols == [] or i == 1:  
+            if cols == [] or i <= 2:  
                 continue
             else:
                 data.append(cols[0].find('a').find(text=True))
-            return data    
-            
-    #/************************************************************************/
-    def find_dimensions(self, **kwargs):
-        if kwargs == {}:    url = self.url
-        else:               url = self.get_url(**kwargs)
-        #kwargs.update({'file': self.BULK_FILE})
-        #url = self.getURL(**kwargs)
-        url = '{url}&file={fil}'.format(url=url, fil=BULK_DIC_FILE)
-        html = self.__get_members(url)
-        data = self.__read_members(html)
-        dimensions = [d.replace('.{ext}'.format(ext=BULK_DIC_EXT),'') for d in data]
-        return dimensions
-     
-    #/************************************************************************/
-    def find_datasets(self, alpha=None, **kwargs):
-        if alpha is None:
-            alpha = list(string.ascii_lowercase)
-        elif not alpha in list(string.ascii_lowercase):
-            raise EurobaseError('unrecognised parameter alpha')
-        else:
-            alpha = list(alpha)
-        datasets = {} # all_datasets = []
-        if kwargs == {}:    url = self.url
-        else:               url = self.get_url(**kwargs)
-        for a in alpha:
-            urla = '{url}&dir={dire}&start={alpha}'.format(url=url, dire=BULK_DATA_DIR, alpha=a)
-            html = self.__get_members(urla)
-            data = self.__read_members(html)
-            datasets[a] = [d.replace('.{ext}'.format(ext=BULK_DATA_EXT),'') for d in data]
-            #all_datasets.append(datasets[a])
-        return datasets #all_datasets
-            
-    @property
-    def members(self):
-        #if self._members is None:   self.setMembers()
-        if isinstance(self.__members, (list,tuple)):
-            return self.__members
-        elif isinstance(self.__members, dict):
-            return [items for lists in self.__members.values() for items in lists]        
-    @members.setter
-    def members(self, members):
-        if not isinstance(members, type(self.__members)):
-            raise EurobaseError('wrong type for members')
-        self.__members = members
+        return data    
  
     #/************************************************************************/
     @staticmethod
     def __check_member(member, members):
+        if members is None or members==[]:
+            raise EurobaseError('no members to compare to')
         if member in members:      
             return True
         else:                       
             return False
-    def check_dimensions(self, dimension):
+    def check_dimension(self, dimension):
         return self.__check_member(dimension, self.dimensions)
-    def check_datasets(self, dataset):
+    def check_dataset(self, dataset):
         return self.__check_member(dataset, self.datasets)
 
-            #/************************************************************************/
+    #/************************************************************************/
     def getDimensions(self, dataset, **kwargs):
         if self._metabase is None:
                 self.setMetabase(**kwargs)
         return self.__metabase
     
     #/************************************************************************/
-    def getMetabase(self, dataset, **kwargs):
-        if self.url is None:
-            self.setURL(**kwargs)
-        #kwargs.update({'dir': self.BULK_DIR, 'start': a})
-        #url = self.getURL(**kwargs)
-        url = '{url}&fil={fil}{ext}'.format(url=self.url, fil=self.METAFILE, ext=self.META_FMT)
-        kwargs.update({'names': ['dataset', 'dimension', 'label'],  compression: 'gzip'})
-        return Request.read_url_table(url, **kwargs)
+    def getMetabase(self, **kwargs):
+        if 'ext' in kwargs:     ext = kwargs.pop('ext')
+        else:                   ext = settings.BULK_META_EXT
+        if 'file' in kwargs:    fil = kwargs.pop('file')
+        else:                   fil = settings.BULK_META_FILE
+        #if kwargs == {}:        
+        url = self.url
+        #else:                   url = self.get_url(**kwargs)
+        url = '{url}&fil={fil}{ext}'.format(url=url, fil=fil, ext=ext)
+        kwargs.update({'header': kwargs.get('header') or None, # no effect...
+                       'names': kwargs.get('names') or ['dataset', 'dimension', 'label']})
+        return self.session.load_file_table(url, **kwargs)
       

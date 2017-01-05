@@ -38,9 +38,9 @@ Basic class for common request operations
 # IMPORT STATEMENTS
 #==============================================================================
 
-import os, sys 
-import inspect, warnings
-import string, re, time
+import os 
+import warnings
+import time
    
 try:                                
     import requests # urllib2
@@ -104,7 +104,8 @@ except ImportError:
 # GLOBAL CLASSES/METHODS/VARIABLES
 #==============================================================================
 
-import settings
+from . import EurobaseWarning, EurobaseError
+from . import settings
 
 
 #==============================================================================
@@ -116,11 +117,23 @@ class Session(object):
     """
     
     def __init__(self, **kwargs):
-        self.__session      = requests.session()
+        # initial default settings
+        self.__session      = None
         self.__cache        = None
-        self.__expire       = 0 # datetime.deltatime(0)
+        self.__time_out     = 0 # datetime.deltatime(0)
         self.__force_download   = False
-    
+        # update with keyword arguments passed
+        if kwargs != {}:
+            attrs = ( 'time_out','force_download','cache' )
+            for attr in list(set(attrs).intersection(kwargs.keys())):
+                try:
+                    setattr(self, '{}'.format(attr), kwargs.pop(attr))
+                except: 
+                    warnings.warn(EurobaseWarning('wrong attribute value {}'.format(attr.upper())))
+        # initialise
+        self.set(**kwargs)
+        print ('in __init__: {}'.format(self.__session))
+        
     """
     class _defaultErrorHandler(urllib2.HTTPDefaultErrorHandler):
         def http_error_default(self, req, fp, code, msg, headers):
@@ -158,15 +171,15 @@ class Session(object):
 
     #/************************************************************************/
     @property
-    def expire(self):
-        return self.__expire
-    @expire.setter
-    def expire(self, expire):
-        if not isinstance(expire, (int, datetime.timedelta)):
-            raise EurobaseError('wrong type for EXPIRE parameter')
-        elif isinstance(expire, int) and expire<0:
-            raise EurobaseError('wrong setting for EXPIRE parameter')
-        self.__expire = expire
+    def time_out(self):
+        return self.__time_out
+    @time_out.setter
+    def time_out(self, time_out):
+        if not isinstance(time_out, (int, datetime.timedelta)):
+            raise EurobaseError('wrong type for TIME_OUT parameter')
+        elif isinstance(time_out, int) and time_out<0:
+            raise EurobaseError('wrong setting for TIME_OUT parameter')
+        self.__time_out = time_out
 
     #/************************************************************************/
     @property
@@ -177,8 +190,20 @@ class Session(object):
         if not isinstance(force_download, bool):
             raise EurobaseError('wrong type for FORCE_DOWNLOAD parameter')
         self.__force_download = force_download
-
+        
     #/************************************************************************/
+    def set(self, **kwargs):
+        try:
+            self.__session = requests.session(**kwargs)
+        except:
+            raise EurobaseError('wrong definition for SESSION parameter')
+    def get(self, **kwargs):
+        try:
+            session = requests.session(**kwargs)
+        except:
+            session = None
+            pass
+        return session or self.__session
     @property
     def session(self):
         return self.__session
@@ -229,10 +254,15 @@ class Session(object):
             #            for i in d[k]: yield (k,i)
             #        else:
             #            yield(k, d[k])
-            #print urlencode(kwargs)
             filters = '&'.join(['{k}={v}'.format(k=k, v=v) for (k, v) in _izip_replicate(kwargs)])
             # filters = '&'.join(map("=".join,kwargs.items()))
-            url = "{url}?{filters}".format(url=url, filters=filters)
+            sep = '?'
+            try:        
+                last = url.rsplit('/',1)[1]
+                if '?' in last:     sep = '&'
+            except:     
+                pass
+            url = "{url}{sep}{filters}".format(url=url, sep=sep, filters=filters)
         return url
     
     #/************************************************************************/
@@ -315,6 +345,7 @@ class Session(object):
         See also
         --------
         """
+        print ('in get_response: {}'.format(self.__session))
         try:
              response = self.__session.get(url) # self.__session.request('get',url)
              response.raise_for_status()
@@ -361,11 +392,11 @@ class Session(object):
         # create cache directory only the fist time it is needed
         # note: html must be a str type not byte type
         cache = kwargs.get('cache') or self.cache or None
-        expire = kwargs.get('cache') or self.expire or 0
+        time_out = kwargs.get('time_out') or self.time_out or 0
         force_download = kwargs.get('force_download') or self.force_download or False
         pathname = self.__build_pathname(url, cache)
-        if force_download or not self.__is_cached(pathname, expire):
-            response = self.__session.get_response(url)
+        if force_download or not self.__is_cached(pathname, time_out):
+            response = self.get_response(url)
             html = response.text
             if cache is not None:
                 if not os.path.exists(cache):
@@ -408,18 +439,18 @@ class Session(object):
             f.close()
         return content
     @staticmethod
-    def __is_cached(pathname, expire):
+    def __is_cached(pathname, time_out):
         if not os.path.exists(pathname):
             resp = False
-        elif expire is 0:
+        elif time_out is 0:
             resp = False
-        elif expire is None:
+        elif time_out is None:
             resp = True
         else:
             cur = time.time()
             mtime = os.stat(pathname).st_mtime
             # print("last modified: %s" % time.ctime(mtime))
-            resp = cur - mtime < expire
+            resp = cur - mtime < time_out
         return resp
 
     #/************************************************************************/
@@ -488,8 +519,14 @@ class Session(object):
        
     #/************************************************************************/
     def load_file_table(self, url, **kwargs): 
-        status = self.get_status(url)
-        names = kwargs.pop('names')
-        df=pd.read_table(url, encoding=str, skip_blank_lines=True, memory_map=True,
-                             error_bad_lines=False, warn_bad_lines=True, **kwargs)
+        self.get_status(url)
+        # set some default values
+        kwargs.update({'encoding': kwargs.get('encoding') or str,
+                        'skip_blank_lines': kwargs.get('skip_blank_lines') or True, 
+                        'memory_map': kwargs.get('memory_map') or True,
+                        'error_bad_lines': kwargs.get('error_bad_lines') or False, 
+                        'warn_bad_lines': kwargs.get('warn_bad_lines') or True,
+                        'compression': kwargs.get('compression') or 'infer'})
+        # run pandas...
+        df = pd.read_table(url, **kwargs)
         return df

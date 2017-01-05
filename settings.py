@@ -36,7 +36,9 @@ LANGS           = ('en','de','fr')
 DEF_LANG        = 'en'
 """
 """
-FMTS            = ('json','unicode')
+DEF_SORT        = 1
+"""
+"""
 """
 """
 DEF_FMT        = 'json'

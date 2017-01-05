@@ -53,29 +53,17 @@ except ImportError:
 else:
     pass
 
-
+from functools import reduce
 
 #==============================================================================
 # GLOBAL CLASSES/METHODS/VARIABLES
 #==============================================================================
 
-class EurobaseError(Exception):
-    """Base class for exceptions in this module."""
-    def __init__(self, msg, expr=None):    
-        self.msg = msg
-        if expr is not None:    self.expr = expr
-    def __str__(self):              return repr(self.msg)
-class EurobaseWarning(Warning):
-    """Base class for warnings in this module."""
-    def __init__(self, msg, expr=None):    
-        self.msg = msg
-        if expr is not None:    self.expr = expr
-    def __str__(self):              return repr(self.msg)
 
-
-import settings
+from . import EurobaseWarning, EurobaseError
+from . import settings
 from .session import Session
-from .database import Database
+from .collection import Collection
 
 #==============================================================================
 # CLASSES/METHODS
@@ -485,7 +473,7 @@ class API(object):
         kwargs.update({'path': "v{vers}/{fmt}/{lang}".format(vers=vers,fmt=fmt,lang=lang)}) 
         if 'precision' not in kwargs:   
             kwargs.update({'precision': 1})
-        url = Request.build_url(**kwargs)
+        url = Session.build_url(**kwargs)
         return url
     def setURL(self, **kwargs):
         [kwargs.update({attr: kwargs.get(attr) or getattr(self, '_{attr}'.format(attr=attr))})
@@ -503,7 +491,7 @@ class API(object):
 
     #/************************************************************************/
     def set(self, **kwargs):
-        if kwargs.get(KW_DEFAULT) is True:  
+        if kwargs.get(settings.KW_DEFAULT) is True:  
             kwargs = {}
         elif kwargs == {}:
             return
@@ -575,10 +563,9 @@ class API(object):
         ------
         * {"error":{"status":"416","label":"Too many categories have been requested. Maximum is 50."}}
         * {"error":{"status":"400","label":"Invalid value for 'wsVersion' parameter"}}
-        """
-        if url is None or url=='':
+         if url is None or url=='':
             url=self.url
-        self.status, response = Request.get_data(url, fmt=self.fmt)
+        self.status, response = Session.get_data(url, fmt=self.fmt)
         try:
             resp = response.read()
         except:
@@ -603,7 +590,8 @@ class API(object):
                     return getattr(pyjstat, attr)
                 except:     
                     raise EurobaseError('method/attribute {} not implemented'.format(attr))
-      
+       """
+       pass
       
       
 #==============================================================================
