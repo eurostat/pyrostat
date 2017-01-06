@@ -51,7 +51,7 @@ BULK_DOMAIN     = 'ec.europa.eu/eurostat/estat-navtree-portlet-prod/'
 BULK_QUERY      = 'BulkDownloadListing'
 """
 """
-BULK_DIC_FILE   = 'dic'
+BULK_DIC_DIR    = 'dic'
 """
 """
 BULK_DIC_LIST   = 'dimlist'
@@ -66,12 +66,16 @@ BULK_DATA_DIR   = 'data'
 BULK_DATA_EXT   = 'tsv.gz'
 """
 """
-BULK_META_FILE  = 'metabase'
+BULK_BASE_FILE  = 'metabase'
 """
 """
-BULK_META_EXT   = 'txt.gz'
+BULK_BASE_EXT   = 'txt.gz'
 """
 """
+BULK_BASE_NAMES = ['dataset', 'dimension', 'label']
+"""
+"""
+# note: DO NOT MODIFY ... or also modify Bulkdata.__get_member accordingly
 
 API_DOMAIN      = 'ec.europa.eu/eurostat/wdds/rest/data'
 """

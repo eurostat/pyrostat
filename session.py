@@ -132,7 +132,6 @@ class Session(object):
                     warnings.warn(EurobaseWarning('wrong attribute value {}'.format(attr.upper())))
         # initialise
         self.set(**kwargs)
-        print ('in __init__: {}'.format(self.__session))
         
     """
     class _defaultErrorHandler(urllib2.HTTPDefaultErrorHandler):
@@ -266,7 +265,7 @@ class Session(object):
         return url
     
     #/************************************************************************/
-    def get_status(self, session, url):
+    def get_status(self, url):
         """Download just the header of a URL and return the server's status code.
         
             >>> session = Session()
@@ -519,9 +518,12 @@ class Session(object):
        
     #/************************************************************************/
     def load_file_table(self, url, **kwargs): 
-        self.get_status(url)
+        try:
+            self.get_status(url)
+        except:
+            return None
         # set some default values
-        kwargs.update({'encoding': kwargs.get('encoding') or str,
+        kwargs.update({'encoding': kwargs.get('encoding') or None,
                         'skip_blank_lines': kwargs.get('skip_blank_lines') or True, 
                         'memory_map': kwargs.get('memory_map') or True,
                         'error_bad_lines': kwargs.get('error_bad_lines') or False, 
