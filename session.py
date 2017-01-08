@@ -407,7 +407,7 @@ class Session(object):
             if not os.path.exists(cache) or not os.path.isdir(cache):
                 raise EurobaseError('cache {} is not a directory'.format(cache))
             html = self.__read_from_cache(pathname)
-        return html
+        return pathname, html
     @staticmethod
     def __build_pathname(url, cache):
         pathname = url.encode('utf-8')
@@ -463,7 +463,7 @@ class Session(object):
         
     #/************************************************************************/
     @classmethod
-    def read_html_table(cls, html, **kwargs): # read vegetables
+    def read_soup_table(cls, html, **kwargs): # read vegetables
         """
         
             >>> 
@@ -514,15 +514,26 @@ class Session(object):
                 headers.append(table.findAll('th'))
                 rows.append(table.findAll('tr')) 
         return headers, rows
-        
-       
+               
     #/************************************************************************/
-    def load_file_table(self, url, **kwargs): 
+    def read_html_table(self, url, **kwargs): 
         try:
             self.get_status(url)
         except:
             return None
-        # set some default values
+        # set some default values (some are already default values for read_table)
+        kwargs.update({'encoding': kwargs.get('encoding') or None})
+        # run pandas...
+        df = pd.read_html(url, **kwargs)
+        return df
+               
+    #/************************************************************************/
+    def read_url_table(self, url, **kwargs): 
+        try:
+            self.get_status(url)
+        except:
+            return None
+        # set some default values (some are already default values for read_table)
         kwargs.update({'encoding': kwargs.get('encoding') or None,
                         'skip_blank_lines': kwargs.get('skip_blank_lines') or True, 
                         'memory_map': kwargs.get('memory_map') or True,

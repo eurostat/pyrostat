@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-.. bulkdata.py
+.. collection.py
 
 Basic class for online database (dimensions+datasets) definitions
 
@@ -65,7 +65,7 @@ from .session import Session
 #==============================================================================
     
 
-class Bulkdata(object):
+class Collection(object):
     """
     http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=dic/en/net_seg10.dic    
     http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=dic/en/dimlist.dic    
@@ -214,6 +214,27 @@ class Bulkdata(object):
         return self.__session #.session
 
     #/************************************************************************/
+    @classmethod
+    def update_url(domain, **kwargs):
+        if kwargs == {}:
+            return domain
+        # set parameters
+        if 'lang' in kwargs:    lang = kwargs.pop('lang')
+        else:                   lang = None
+        if lang is not None and lang not in settings.LANGS:
+            raise EurobaseError('language not supported')
+        # bug with the API? note that 'sort' needs to be the first item of the 
+        # filters
+        if 'sort' in kwargs:    sort = kwargs.pop('sort')
+        else:                   sort = settings.DEF_SORT
+        kwargs = OrderedDict(([('sort',sort)]+list(kwargs.items())))
+        # see also https://www.python.org/dev/peps/pep-0468/ 
+        url = Session.build_url(domain, **kwargs)
+        if lang is not None:
+            url = "{url}/{lang}".format(url=url,lang=lang)
+        return url
+
+    #/************************************************************************/
     def setURL(self, **kwargs):
         """Set the query URL to *Bulk download* web service.
         
@@ -261,74 +282,126 @@ class Bulkdata(object):
             
     #/************************************************************************/
     @property
-    def all_datasets(self):
-        if self.metadata is not None:
-            return self.__metadata[settings.BULK_BASE_NAMES[0]].unique().tolist()
-        else:
-            return self.bulk_datasets
+    def meta_datasets(self):
+        if self.metabase is not None:
+            raise EurobaseError('no METABASE data found') 
+        return self.metabase[settings.BULK_BASE_NAMES[0]].unique().tolist()
     @property
     def bulk_datasets(self):
         datasets = []
-        url = self.__complete_url(self.url, sort=self.sort, dir=settings.BULK_DATA_DIR)
+        url = self.update_url(self.url, sort=self.sort, dir=settings.BULK_DATA_DIR)
+        kwargs = {'skiprows': [1], 'header': 0}
         for alpha in list(string.ascii_lowercase):
-            urlalpha = '{url}&start={alpha}'.format(url=url, alpha=alpha)
-            html = self.session.load_page(urlalpha)
-            if html is None or html == '':
-                raise EurobaseError('no HTML content found') 
-            _, rows = self.session.read_html_table(html, attrs={'class':'filelist'})
-            datasets += [d.replace('.{}'.format(settings.BULK_DATA_EXT),'')     \
-                                       for d in self.__filter_table(rows)]
+            urlalpha = '{url}&start={alpha}'.format(url=url, alpha=alpha)        
+            try:
+                df = self.session.read_html_table(urlalpha, **kwargs)
+            except:
+                warnings.warn(EurobaseWarning('impossible to read html table: {}'.format(urlalpha)))
+            else:
+                # note the call to df[0] since there is one table only in the page
+                datasets += [d.split('.')[0] for d in list(df[0]['Name'])]
         return datasets
-    @property
-    def all_dimensions(self):
-        if self.metadata is not None:
-            return self.__metadata[settings.BULK_BASE_NAMES[1]].unique().tolist()
+    def load_dataset(self, dataset, **kwargs):
+        """
+        example 
+        http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=data%2Faact_ali01.tsv.gz
+        http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=data%2Faact_ali01.sdmx.zip     
+        """
+        try:
+            resp = self.check_dataset(self, dataset)
+        except: 
+            pass
         else:
-            return self.bulk_dimensions
+            if resp is False:   
+                raise EurobaseError('wrong DIMENSION') 
+        url = self.update_url(self.url, sort=self.sort, file=settings.BULK_DATA_DIR)
+        try:
+            ext = kwargs.pop('ext')
+        except:
+            ext = settings.BULK_DATA_EXTS[0]
+        else:
+            if ext not in settings.BULK_DATA_EXTS:   
+                raise EurobaseError('bulk data extension EXT not recognised') 
+        if settings.BULK_DATA_ZIP != '':
+            ext = '{ext}.{zip}'.format(ext=ext, zip=settings.BULK_DATA_ZIP)
+        url = '{url}/{set}.{ext}'.format(url=url, data=dataset, ext=ext)
+        pathname, html = self.session.load_page(self, url, **kwargs)
+        return pathname, html
+
+    #/************************************************************************/
+    @property
+    def meta_dimensions(self):
+        if self.metabase is not None:
+            raise EurobaseError('no METABASE data found') 
+        return self.metabase[settings.BULK_BASE_NAMES[1]].unique().tolist()
     @property
     def bulk_dimensions(self):
-        url = self.__complete_url(self.url, lang=self.lang, sort=self.sort, dir=settings.BULK_DIC_DIR)
-        html = self.session.load_page(url)
+        url = self.update_url(self.url, lang=self.lang, sort=self.sort, dir=settings.BULK_DIC_DIR)
+        kwargs = {'skiprows': [1], 'header': 0}
+        try:
+            df = self.session.read_html_table(url, **kwargs)
+        except:
+            raise EurobaseError('impossible to read html table: {}'.format(url)) 
+        else:
+            dimensions = [d.split('.')[0] for d in list(df[0]['Name'])]
+        # note the call to df[0] since there is one table only in the page
+        return dimensions
+    def load_dimension(self, dimension, **kwargs):
+        """
+        example http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=dic%2Fen%2Faccident.dic
+        """
+        try:
+            resp = self.check_dimension(self, dimension)
+        except: 
+            pass
+        else:
+            if resp is False:
+                raise EurobaseError('wrong DIMENSION') 
+        url = self.update_url(self.url, lang=self.lang, sort=self.sort, file=settings.BULK_DIC_DIR)
+        try:
+            ext = kwargs.pop('ext')
+        except:
+            ext = settings.BULK_DIC_EXTS[0]
+        else:
+            if ext not in settings.BULK_DIC_EXTS:   
+                raise EurobaseError('bulk dictionary extension EXT not recognised') 
+        if settings.BULK_DIC_ZIP != '':
+            ext = '{ext}.{zip}'.format(ext=ext, zip=settings.BULK_DIC_ZIP)
+        url = '{url}/{dic}.{ext}'.format(url=url, dic=dimension, ext=ext)
+        pathname, html = self.session.load_page(self, url, **kwargs)
+        return pathname, html
+
+    @property
+    def __obsolete_bulk_datasets(self):
+        datasets = []
+        url = self.update_url(self.url, sort=self.sort, dir=settings.BULK_DATA_DIR)
+        for alpha in list(string.ascii_lowercase):
+            urlalpha = '{url}&start={alpha}'.format(url=url, alpha=alpha)
+            _, html = self.session.load_page(urlalpha)
+            if html is None or html == '':
+                raise EurobaseError('no HTML content found') 
+            _, rows = self.session.read_soup_table(html, attrs={'class':'filelist'})
+            datasets += [d.split('.')[0] for d in self.__filter_table(rows)]
+        return datasets
+    @property
+    def __obsolete_bulk_dimensions(self):
+        url = self.update_url(self.url, lang=self.lang, sort=self.sort, dir=settings.BULK_DIC_DIR)
+        _, html = self.session.load_page(url)
         if html is None or html == '':
             raise EurobaseError('no HTML content found') 
-        _, rows = self.session.read_html_table(html, attrs={'class':'filelist'})
-        dimensions = [d.replace('.{}'.format(settings.BULK_DIC_EXT),'')     \
-                                for d in self.__filter_table(rows)]
+        _, rows = self.session.read_soup_table(html, attrs={'class':'filelist'})
+        dimensions = [d.split('.')[0] for d in self.__filter_table(rows)]
         return dimensions
-        
     @staticmethod
-    def __complete_url(domain, **kwargs):
-        if kwargs == {}:
-            return domain
-        # set parameters
-        if 'lang' in kwargs:    lang = kwargs.pop('lang')
-        else:                   lang = None
-        if lang is not None and lang not in settings.LANGS:
-            raise EurobaseError('language not supported')
-        # bug with the API? note that 'sort' needs to be the first item of the 
-        # filters
-        if 'sort' in kwargs:    sort = kwargs.pop('sort')
-        else:                   sort = settings.DEF_SORT
-        kwargs = OrderedDict(([('sort',sort)]+list(kwargs.items())))
-        # see also https://www.python.org/dev/peps/pep-0468/ 
-        url = Session.build_url(domain, **kwargs)
-        if lang is not None:
-            url = "{url}/{lang}".format(url=url,lang=lang)
-        return url
-    @staticmethod
-    def __filter_table(rows):
+    def __obsolete__filter_table(rows):
         rows = rows[0] # only one table in the page
         data, i = [], 0
         for row in rows:
             i = i+1
-            try:
-                cols = row.find_all("td")
-            except:
-                cols = row.findAll("td")
-            if cols == [] or i <= 2:  
-                continue
-            else:
-                data.append(cols[0].find('a').find(text=True))
+            try:                        cols = row.find_all("td")
+            except:                     cols = row.findAll("td")
+            if cols == [] or i <= 2:    continue
+            else:                       data.append(cols[0].find('a').find(text=True))
         return data    
  
     #/************************************************************************/
@@ -341,9 +414,9 @@ class Bulkdata(object):
         else:                       
             return False
     def check_dimension(self, dimension):
-        return self.__check_member(dimension, self.all_dimensions)
+        return self.__check_member(dimension, self.dimensions)
     def check_dataset(self, dataset):
-        return self.__check_member(dataset, self.all_datasets)
+        return self.__check_member(dataset, self.datasets)
     
     #/************************************************************************/
     def setDatasets(self, dataset):
@@ -382,24 +455,58 @@ class Bulkdata(object):
      
     #/************************************************************************/
     def setMetabase(self, **kwargs):
-        self.__metabase = self.getMetabase(**kwargs)
-    #/************************************************************************/
-    def getMetabase(self, **kwargs):
-        basefile = '{}.{}'.format(settings.BULK_BASE_FILE, settings.BULK_BASE_EXT)
-        url = self.__complete_url(self.url, sort=self.sort, file=basefile)
-        html = self.session.load_page(url)
-        if html is None or html == '':
-            raise EurobaseError('no HTML content found') 
+        self.__metabase = self.read_metabase(**kwargs)
+    def read_metabase(self, **kwargs):
+        basefile = '{base}.{ext}'.format(base=settings.BULK_BASE_FILE, ext=settings.BULK_BASE_EXT)
+        if settings.BULK_BASE_ZIP != '':
+            basefile = '{base}.{zip}'.format(base=basefile, zip=settings.BULK_BASE_ZIP)
+        url = self.update_url(self.url, sort=self.sort, file=basefile)
         kwargs.update({'header': None, # no effect...
                        'names': self.BULK_BASE_NAMES})
         # !!! it seems there is a problem with compression='infer' since it is 
         # not working well !!!
         dcomp = {'gz': 'gzip', 'bz2': 'bz2', 'zip': 'zip' }
-        compression =[dcomp[ext] for ext in dcomp if settings.BULK_BASE_EXT.endswith(ext)][0]
-        kwargs.update({'compression': compression})
+        #compression =[dcomp[ext] for ext in dcomp if settings.BULK_BASE_EXT.endswith(ext)][0]
+        kwargs.update({'compression': dcomp[settings.BULK_BASE_ZIP]})
         # run the pandas.read_table method
         try:
-            metabase = self.session.load_file_table(url, **kwargs)
+            metabase = self.session.read_url_table(url, **kwargs)
         except:
             metabase = None
         return metabase
+
+    #/************************************************************************/
+    def setTOC(self, **kwargs):
+        self.__toc = self.read_toc(**kwargs)
+    def read_toc(self, **kwargs):
+        """
+        Example: http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=table_of_contents.xml
+        """
+        try:
+            ext = kwargs.pop('ext')
+        except:
+            ext = settings.BULK_DIC_EXTS[0]
+        else:
+            if ext not in settings.BULK_TOC_EXTS:   
+                raise EurobaseError('bulk table of contents extension EXT not recognised') 
+        try:
+            lang = kwargs.pop('lang')
+        except:
+            lang = self.lang
+        else:
+            if lang not in settings.LANGS:   
+                raise EurobaseError('language LANG not recognised') 
+        if ext == 'xml':
+            basefile = '{base}.xml'.format(base=settings.BULK_BASE_FILE)
+        else:
+            basefile = '{base}_{lang}.{ext}'.format(base=settings.BULK_BASE_FILE, lang=lang, ext=ext)
+        if settings.BULK_TOC_ZIP != '':
+            basefile = '{base}.{zip}'.format(base=basefile, zip=settings.BULK_DIC_ZIP)
+        url = self.update_url(self.url, sort=self.sort, file=basefile)
+        kwargs.update({'header': 0})
+        try:
+            toc = self.session.read_html_table(url, **kwargs)
+        except:
+            toc = None
+        return toc
+         

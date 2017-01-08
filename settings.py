@@ -57,25 +57,46 @@ BULK_DIC_DIR    = 'dic'
 BULK_DIC_LIST   = 'dimlist'
 """
 """
-BULK_DIC_EXT    = 'dic'
+BULK_DIC_EXTS   = ['dic'] # should be a list
+"""
+"""
+BULK_DIC_ZIP    = 'gz' 
 """
 """
 BULK_DATA_DIR   = 'data'
 """
 """
-BULK_DATA_EXT   = 'tsv.gz'
+BULK_DATA_EXTS  = ['tsv', 'sdmx'] # should be a list
+"""
+"""
+BULK_DATA_ZIP   = 'gz'
 """
 """
 BULK_BASE_FILE  = 'metabase'
 """
 """
-BULK_BASE_EXT   = 'txt.gz'
+BULK_BASE_EXT   = 'txt'
 """
 """
-BULK_BASE_NAMES = ['dataset', 'dimension', 'label']
+BULK_BASE_ZIP   = 'gz' 
 """
 """
-# note: DO NOT MODIFY ... or also modify Bulkdata.__get_member accordingly
+BULK_BASE_NAMES = ['dataset', 'dimension', 'label'] # should be a list
+"""
+""" # note: DO NOT MODIFY ... or also modify Collection.__get_member accordingly
+BULK_TOC_FILE   = 'table_of_contents'
+"""
+"""
+BULK_TOC_EXTS   = ['txt', 'xml'] # should be a list
+"""
+"""
+BULK_TOC_ZIP    = ''
+"""
+"""
+BULK_TOC_NAMES  = ['title','code','type','last update of data',     \
+                   'last table structure change',                   \
+                   'data start','data end']
+
 
 API_DOMAIN      = 'ec.europa.eu/eurostat/wdds/rest/data'
 """
