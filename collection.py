@@ -485,7 +485,7 @@ class Collection(object):
         try:
             ext = kwargs.pop('ext')
         except:
-            ext = settings.BULK_DIC_EXTS[0]
+            ext = settings.BULK_TOC_EXTS[0]
         else:
             if ext not in settings.BULK_TOC_EXTS:   
                 raise EurobaseError('bulk table of contents extension EXT not recognised') 
@@ -505,8 +505,15 @@ class Collection(object):
         url = self.update_url(self.url, sort=self.sort, file=basefile)
         kwargs.update({'header': 0})
         try:
-            toc = self.session.read_html_table(url, **kwargs)
+            if ext == 'xml':
+                toc = self.session.read_html_table(url, **kwargs)
+                toc = toc[0]
+            else:
+                toc = self.session.read_url_table(url, **kwargs)
         except:
             toc = None
+        else:
+            toc.drop(toc.columns[-1], axis=1, inplace=True)
+            toc.applymap(lambda x: x.strip())
         return toc
          
