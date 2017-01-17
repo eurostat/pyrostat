@@ -166,195 +166,53 @@ class API(object):
                 obj_str += '\t[!not set!]\n'
             else:
                 obj_str += '\t' + tmp_str + '\n'
-        return obj_str
+        return obj_str    
 
     #/************************************************************************/
-    @staticmethod
-    def _check_format(fmt):
-        if not(fmt is None or fmt in API.REST_FMTS):        
-            raise EurobaseError('unrecognised format')
-        else:                           
-            return fmt
-    def setFmt(self, fmt):
-        """
-        
-            >>> 
-            
-        Arguments
-        ---------
-        
-        Keyword Arguments
-        -----------------        
-
-        Returns
-        -------
-
-        Raises
-        ------
-
-        Note
-        ----
-        """
-        self._fmt=self._check_format(fmt)       
-    def getFmt(self, fmt=None):
-        """
-        
-            >>> 
-            
-        Arguments
-        ---------
-        
-        Keyword Arguments
-        -----------------        
-
-        Returns
-        -------
-
-        Raises
-        ------
-
-        Note
-        ----
-        """
-        return self._check_format(fmt) or self._fmt
     @property
     def fmt(self):
-        """
-        
-            >>> 
-            
-        Arguments
-        ---------
-        
-        Keyword Arguments
-        -----------------        
-
-        Returns
-        -------
-
-        Raises
-        ------
-
-        Note
-        ----
-        """
-        return self._fmt      
+        return self.__fmt
     @fmt.setter
-    def fmt(self,fmt):
-        self.setFmt(fmt)
+    def fmt(self, fmt):
+        if not isinstance(fmt, str):
+            raise EurobaseError('wrong type for FMT parameter')
+        elif not lang in settings.API_FMTS:
+            raise EurobaseError('format not supported')
+        self.__fmt = fmt
            
     #/************************************************************************/
-    @staticmethod
-    def _check_language(language):
-        if not(language is None or language in API.REST_LANGS):     
-            raise EurobaseError('unrecognised language') 
-        else:                               
-            return language
-    def setLang(self, language):
-        """
-        
-            >>> 
-            
-        Arguments
-        ---------
-        
-        Keyword Arguments
-        -----------------        
-
-        Returns
-        -------
-
-        Raises
-        ------
-
-        Note
-        ----
-        """
-        self._lang=self._check_language(language)       
-    def getLang(self, language=None):
-        """
-        
-            >>> 
-            
-        Arguments
-        ---------
-        
-        Keyword Arguments
-        -----------------        
-
-        Returns
-        -------
-
-        Raises
-        ------
-
-        Note
-        ----
-        """
-        return self._check_language(language) or self._lang
     @property
     def lang(self):
-        """
-        
-            >>> 
-            
-        Arguments
-        ---------
-        
-        Keyword Arguments
-        -----------------        
-
-        Returns
-        -------
-
-        Raises
-        ------
-
-        Note
-        ----
-        """
-        return self._lang      
+        return self.__lang
     @lang.setter
-    def lang(self,lang):
-        self.setLang(lang)
+    def lang(self, lang):
+        if not isinstance(lang, str):
+            raise EurobaseError('wrong type for LANG parameter')
+        elif not lang in settings.API_LANGS:
+            raise EurobaseError('language not supported')
+        self.__lang = lang
       
     #/************************************************************************/
-    @staticmethod
-    def _check_version(version):
-        if not(version is None or isinstance(version,float)): 
-            raise EurobaseError('wrong format/unrecognised version')
-        elif version < API.VERS_REST:           
-            raise EurobaseError('version not supported') 
-        else:                               
-            return version
-    def setVers(self, version):
-        self._vers=self._check_version(version)       
-    def getVers(self, version=None):
-        return self._check_version(version) or self._vers
     @property
     def vers(self):
-        return self._vers     
+        return self.__vers     
     @vers.setter
-    def vers(self,vers):
-        self.setVers(vers)
+    def vers(self,version):
+        if not(version is None or isinstance(version,float)): 
+            raise EurobaseError('wrong format/unrecognised version')
+        elif version < settings.API_VERSION:           
+            raise EurobaseError('version not supported') 
+        self.__vers = version
       
     #/************************************************************************/
-    @staticmethod
-    def _check_domain(domain):
-        if not(domain is None or isinstance(domain,str)):    
-            raise EurobaseError('wrong format/unrecognised domain') 
-        else:                               
-            return domain
-    def setDomain(self, domain):
-        self._domain=self._check_domain(domain)       
-    def getDomain(self, domain=None):
-        return self._check_domain(domain) or self._domain
     @property
     def domain(self):
-        return self._domain     
+        return self.__domain     
     @domain.setter
     def domain(self,domain):
-        self.setDomain(domain)
+        if not(domain is None or isinstance(domain,str)):    
+            raise EurobaseError('wrong format/unrecognised domain') 
+        self.__domain = domain
       
     #/************************************************************************/
     @staticmethod
