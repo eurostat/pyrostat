@@ -107,7 +107,8 @@ API_VERS        = 2.1
 API_PRECISION   = 1 # only available at the moment? 
 """
 """
-
+API_FMTS        = ('json', 'unicode')
+API_LANGS       = ('en','de','fr')
 KW_DEFAULT      = 'default'
 """
 """
