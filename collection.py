@@ -513,7 +513,7 @@ class Collection(object):
         except:
             toc = None
         else:
-            toc.drop(toc.columns[-1], axis=1, inplace=True)
+            toc.drop(toc.columns[-1], axis=1, inplace=True) # toc.columns[-1] is 'values'
             toc.applymap(lambda x: x.strip())
         return toc
          
