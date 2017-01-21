@@ -60,6 +60,9 @@ BULK_DIC_LIST   = 'dimlist'
 BULK_DIC_EXTS   = ['dic'] # should be a list
 """
 """
+BULK_DIC_NAMES  = {'Name':'Name', 'Size':'Size', 'Type':'Type', 'Date':'Date'}
+"""
+"""
 BULK_DIC_ZIP    = 'gz' 
 """
 """
@@ -67,6 +70,9 @@ BULK_DATA_DIR   = 'data'
 """
 """
 BULK_DATA_EXTS  = ['tsv', 'sdmx'] # should be a list
+"""
+"""
+BULK_DATA_NAMES  = {'Name':'Name', 'Size':'Size', 'Type':'Type', 'Date':'Date'}
 """
 """
 BULK_DATA_ZIP   = 'gz'
@@ -81,7 +87,7 @@ BULK_BASE_EXT   = 'txt'
 BULK_BASE_ZIP   = 'gz' 
 """
 """
-BULK_BASE_NAMES = ['dataset', 'dimension', 'label'] # should be a list
+BULK_BASE_NAMES = {'dataset':'dataset', 'dimension':'dimension', 'label':'label'} # should be a list
 """
 """ # note: DO NOT MODIFY ... or also modify Collection.__get_member accordingly
 BULK_TOC_FILE   = 'table_of_contents'
