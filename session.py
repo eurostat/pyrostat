@@ -458,8 +458,8 @@ class Session(object):
         :param url:
         :returns: True if the file can be retrieved from the disk (cache)
         """
-        pathname = self.__build_pathname(url, dirname=self.__cache)
-        return self.__is_cached(pathname, expire=self.__expire)
+        pathname = self.__build_pathname(url, self.cache)
+        return self.__is_cached(pathname, self.time_out)
         
     #/************************************************************************/
     @classmethod
