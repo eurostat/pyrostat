@@ -214,7 +214,7 @@ class Collection(object):
         return self.__session #.session
 
     #/************************************************************************/
-    @classmethod
+    @staticmethod
     def update_url(domain, **kwargs):
         if kwargs == {}:
             return domain
@@ -266,7 +266,7 @@ class Collection(object):
         #[kwargs.update({attr: kwargs.get(attr) or getattr(self, '{}'.format(attr))})
         #    for attr in ('query','sort')]
         kwargs.update({'query': kwargs.get('query') or self.query})
-        self.__url=Session.build_url(self.domain, **kwargs)
+        self.__url = Session.build_url(self.domain, **kwargs)
     def getURL(self, **kwargs):
         # update/merge passed arguments with already existing ones
         if 'lang' in  kwargs:   kwargs.pop('lang')
@@ -280,96 +280,148 @@ class Collection(object):
         #if self._url is None:   self.setURL()
         return self.__url
             
-    #/************************************************************************/
-    @property
-    def meta_datasets(self):
-        if self.metabase is not None:
-            raise EurobaseError('no METABASE data found') 
-        return self.metabase[settings.BULK_BASE_NAMES[0]].unique().tolist()
-    @property
-    def bulk_datasets(self):
-        datasets = []
-        url = self.update_url(self.url, sort=self.sort, dir=settings.BULK_DATA_DIR)
-        kwargs = {'skiprows': [1], 'header': 0}
-        for alpha in list(string.ascii_lowercase):
+    def latest_update(self, **kwargs):
+        dimension, dataset = [kwargs.get(key) for key in ('dic','data')]
+        if dataset is None and dimension is None:
+            raise EurobaseError('one of the parameters DIC or DATA needs to be set')
+        elif not(dataset is None or dimension is None):
+            raise EurobaseError('parameters DIC or DATA are incompatible')
+        if dimension is not None:
+            df = self.loadTable('dic')
+            kname, kdate = [settings.BULK_DIC_NAMES.get(key) for key in ('Name','Date')]
+        else:
+            df = self.loadTable('data', alpha=dataset[0])
+            kname, kdate = [settings.BULK_DATA_NAMES.get(key) for key in ('Name','Date')]
+        try:
+            names = [d.split('.')[0] for d in list(df[0][kname])]
+            dates = [d.split('.')[0] for d in list(df[0][kdate])]
+        except:
+            raise EurobaseError('impossible to read {}/{} columns of bulk table'.format(kname,kdate)) 
+        try:
+            ipar = names.index(dataset or dimension)
+        except:
+            raise EurobaseError('entry {} not found in bulk table'.format(dataset or dimension)) 
+        else:
+            date = dates[ipar]
+        return date
+    def readTable(self, table, alpha='a'):
+        df = None
+        if table == 'dic':
+            # note that alpha is ignored
+            url = self.update_url(self.url, lang=self.lang, sort=self.sort, dir=settings.BULK_DIC_DIR)
+            kwargs = {'skiprows': [1], 'header': 0}
+            try:
+                df = self.session.read_html_table(url, **kwargs)
+            except:
+                raise EurobaseError('impossible to read html table: {}'.format(url)) 
+        elif table == 'data':
+            url = self.update_url(self.url, sort=self.sort, dir=settings.BULK_DATA_DIR)
+            kwargs = {'skiprows': [1], 'header': 0}
             urlalpha = '{url}&start={alpha}'.format(url=url, alpha=alpha)        
+            if alpha not in list(string.ascii_lowercase):
+                raise EurobaseError('wrong parameter ALPHA')
             try:
                 df = self.session.read_html_table(urlalpha, **kwargs)
             except:
-                warnings.warn(EurobaseWarning('impossible to read html table: {}'.format(urlalpha)))
-            else:
-                # note the call to df[0] since there is one table only in the page
-                datasets += [d.split('.')[0] for d in list(df[0]['Name'])]
-        return datasets
-    def load_dataset(self, dataset, **kwargs):
+                raise EurobaseError('impossible to read html table: {}'.format(url)) 
+        return df
+    def loadTable(self, table, alpha='a'):
+        if not table in ('dic','data'):
+            raise EurobaseError('keyword parameter {} not recognised'.format(table))
+        elif table == 'dic':
+            if not hasattr(self.__dimensions, '_table_'):
+                self.__dimensions['_table_'] = self.readTable(table)
+            return self.__dimensions['_table_']
+        else:
+            if not hasattr(self.__datasets, '_table_'):
+                if not hasattr(self.__datasets['_table_'], alpha):
+                    self.__datasets['_table_'][alpha] = self.readTable(table, alpha)
+            return self.__datasets['_table_'][alpha]
+    def readBulk(self, **kwargs):
         """
-        example 
+        dimension example:
+        example http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=dic%2Fen%2Faccident.dic
+
+        dataset example: 
         http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=data%2Faact_ali01.tsv.gz
         http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=data%2Faact_ali01.sdmx.zip     
         """
-        try:
-            resp = self.check_dataset(self, dataset)
-        except: 
-            pass
-        else:
-            if resp is False:   
-                raise EurobaseError('wrong DIMENSION') 
-        url = self.update_url(self.url, sort=self.sort, file=settings.BULK_DATA_DIR)
+        try:    dimension = kwargs.pop('dic')
+        except: dimension = None
+        else:   key, entity = 'DIC', 'dimension'
+        try:    dataset = kwargs.pop('data')
+        except: dataset = None
+        else:   key, entity = 'DATA', 'dataset'
+        if dataset is None and dimension is None:
+            raise EurobaseError('one of the parameters DIC or DATA needs to be set')
+        elif not(dataset is None or dimension is None):
+            raise EurobaseError('parameters DIC or DATA are incompatible')
+        bulk_exts = settings.__builtins__['BULK_{}_EXTS'.format(key)]
+        bulk_zip = settings.__builtins__['BULK_{}_ZIP'.format(key)]
+        bulk_dir = settings.__builtins__['BULK_{}_DIR'.format(key)]
         try:
             ext = kwargs.pop('ext')
         except:
-            ext = settings.BULK_DATA_EXTS[0]
+            ext = bulk_exts[0]
         else:
-            if ext not in settings.BULK_DATA_EXTS:   
-                raise EurobaseError('bulk data extension EXT not recognised') 
-        if settings.BULK_DATA_ZIP != '':
-            ext = '{ext}.{zip}'.format(ext=ext, zip=settings.BULK_DATA_ZIP)
-        url = '{url}/{set}.{ext}'.format(url=url, data=dataset, ext=ext)
+            if ext not in bulk_exts:   
+                raise EurobaseError('bulk {} extension EXT not recognised'.format(key)) 
+        if bulk_zip != '':
+            ext = '{ext}.{zip}'.format(ext=ext, zip=bulk_zip)
+        try:
+            resp = getattr(self, 'check_{}'.format(entity))(dimension or dataset)
+        except: 
+            pass
+        else:
+            if resp is False:
+                raise EurobaseError('wrong {}'.format(key)) 
+        url = self.update_url(self.url, sort=self.sort, file=bulk_dir)
+        if dimension is not None:
+            url = '{}/{}'.format(url, self.lang)
+        url = '{}/{}.{}'.format(url, dimension or dataset, ext)
         pathname, html = self.session.load_page(self, url, **kwargs)
         return pathname, html
 
     #/************************************************************************/
     @property
-    def meta_dimensions(self):
-        if self.metabase is not None:
+    def meta_datasets(self):
+        if self.metabase is None:
             raise EurobaseError('no METABASE data found') 
-        return self.metabase[settings.BULK_BASE_NAMES[1]].unique().tolist()
+        dataset = settings.BULK_BASE_NAMES['dataset']
+        return self.metabase[dataset].unique().tolist()
+    @property
+    def bulk_datasets(self):
+        datasets = []
+        # url = self.update_url(self.url, sort=self.sort, dir=settings.BULK_DATA_DIR)
+        # kwargs = {'skiprows': [1], 'header': 0}
+        kname = settings.BULK_DATA_NAMES['Name']
+        for alpha in list(string.ascii_lowercase):
+            try:
+                df = self.loadTable('data', alpha=alpha)
+            except:
+                warnings.warn(EurobaseWarning('impossible to read html table: {}'.format(alpha)))
+            else:
+                # note the call to df[0] since there is one table only in the page
+                datasets += [d.split('.')[0] for d in list(df[0][kname])]
+        return datasets
+
+    #/************************************************************************/
+    @property
+    def meta_dimensions(self):
+        if self.metabase is None:
+            raise EurobaseError('no METABASE data found') 
+        dimension = settings.BULK_BASE_NAMES['dimension']
+        return self.metabase[dimension].unique().tolist()
     @property
     def bulk_dimensions(self):
-        url = self.update_url(self.url, lang=self.lang, sort=self.sort, dir=settings.BULK_DIC_DIR)
-        kwargs = {'skiprows': [1], 'header': 0}
+        df = self.loadTableDimensions()
+        kname = settings.BULK_DIC_NAMES['Name']
         try:
-            df = self.session.read_html_table(url, **kwargs)
+            # note the call to df[0] since there is one table only in the page
+            dimensions = [d.split('.')[0] for d in list(df[0][kname])]
         except:
-            raise EurobaseError('impossible to read html table: {}'.format(url)) 
-        else:
-            dimensions = [d.split('.')[0] for d in list(df[0]['Name'])]
-        # note the call to df[0] since there is one table only in the page
+            raise EurobaseError('impossible to read {} column of bulk table'.format(kname)) 
         return dimensions
-    def load_dimension(self, dimension, **kwargs):
-        """
-        example http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=dic%2Fen%2Faccident.dic
-        """
-        try:
-            resp = self.check_dimension(self, dimension)
-        except: 
-            pass
-        else:
-            if resp is False:
-                raise EurobaseError('wrong DIMENSION') 
-        url = self.update_url(self.url, lang=self.lang, sort=self.sort, file=settings.BULK_DIC_DIR)
-        try:
-            ext = kwargs.pop('ext')
-        except:
-            ext = settings.BULK_DIC_EXTS[0]
-        else:
-            if ext not in settings.BULK_DIC_EXTS:   
-                raise EurobaseError('bulk dictionary extension EXT not recognised') 
-        if settings.BULK_DIC_ZIP != '':
-            ext = '{ext}.{zip}'.format(ext=ext, zip=settings.BULK_DIC_ZIP)
-        url = '{url}/{dic}.{ext}'.format(url=url, dic=dimension, ext=ext)
-        pathname, html = self.session.load_page(self, url, **kwargs)
-        return pathname, html
 
     @property
     def __obsolete_bulk_datasets(self):
