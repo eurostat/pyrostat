@@ -23,6 +23,7 @@ Basic definitions for Eurobase API
 # GLOBAL CLASSES/METHODS/VARIABLES
 #==============================================================================
 
+PACKAGE         = "esdata"
 
 PROTOCOLS       = ('http', 'https', 'ftp')
 """
