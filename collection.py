@@ -212,7 +212,7 @@ class Collection(object):
     @property
     def session(self):
         return self.__session #.session
-
+ 
     #/************************************************************************/
     @staticmethod
     def update_url(domain, **kwargs):
@@ -233,7 +233,7 @@ class Collection(object):
         if lang is not None:
             url = "{url}/{lang}".format(url=url,lang=lang)
         return url
-
+       
     #/************************************************************************/
     def setURL(self, **kwargs):
         """Set the query URL to *Bulk download* web service.
@@ -280,7 +280,8 @@ class Collection(object):
         #if self._url is None:   self.setURL()
         return self.__url
             
-    def latest_update(self, **kwargs):
+    #/************************************************************************/
+    def last_update(self, **kwargs):
         dimension, dataset = [kwargs.get(key) for key in ('dic','data')]
         if dataset is None and dimension is None:
             raise EurobaseError('one of the parameters DIC or DATA needs to be set')
@@ -304,38 +305,36 @@ class Collection(object):
         else:
             date = dates[ipar]
         return date
-    def readTable(self, table, alpha='a'):
+
+    #/************************************************************************/
+    def readTable(self, key, alpha='a'):
         df = None
-        if table == 'dic':
+        kwargs = {'skiprows': [1], 'header': 0}
+        bulk_dir = settings.__builtins__['BULK_{}_DIR'.format(key)]
+        url = self.update_url(self.url, sort=self.sort, dir=bulk_dir)
+        if key == 'dic':
             # note that alpha is ignored
-            url = self.update_url(self.url, lang=self.lang, sort=self.sort, dir=settings.BULK_DIC_DIR)
-            kwargs = {'skiprows': [1], 'header': 0}
-            try:
-                df = self.session.read_html_table(url, **kwargs)
-            except:
-                raise EurobaseError('impossible to read html table: {}'.format(url)) 
-        elif table == 'data':
-            url = self.update_url(self.url, sort=self.sort, dir=settings.BULK_DATA_DIR)
-            kwargs = {'skiprows': [1], 'header': 0}
-            urlalpha = '{url}&start={alpha}'.format(url=url, alpha=alpha)        
+            url = '{}/{}'.format(url, self.lang)
+        elif key == 'data':
             if alpha not in list(string.ascii_lowercase):
                 raise EurobaseError('wrong parameter ALPHA')
-            try:
-                df = self.session.read_html_table(urlalpha, **kwargs)
-            except:
-                raise EurobaseError('impossible to read html table: {}'.format(url)) 
+            url = '{url}&start={alpha}'.format(url=url, alpha=alpha)        
+        try:
+            df = self.session.read_html_table(url, **kwargs)
+        except:
+            raise EurobaseError('impossible to read html table: {}'.format(url)) 
         return df
-    def loadTable(self, table, alpha='a'):
-        if not table in ('dic','data'):
-            raise EurobaseError('keyword parameter {} not recognised'.format(table))
-        elif table == 'dic':
+    def loadTable(self, key, alpha='a'):
+        if not key in ('dic','data'):
+            raise EurobaseError('keyword parameter {} not recognised'.format(key))
+        elif key == 'dic':
             if not hasattr(self.__dimensions, '_table_'):
-                self.__dimensions['_table_'] = self.readTable(table)
+                self.__dimensions['_table_'] = self.readTable(key)
             return self.__dimensions['_table_']
         else:
-            if not hasattr(self.__datasets, '_table_'):
-                if not hasattr(self.__datasets['_table_'], alpha):
-                    self.__datasets['_table_'][alpha] = self.readTable(table, alpha)
+            if not hasattr(self.__datasets, '_table_')                      \
+                and  not hasattr(self.__datasets['_table_'], alpha):
+                    self.__datasets['_table_'][alpha] = self.readTable(key, alpha)
             return self.__datasets['_table_'][alpha]
     def readBulk(self, **kwargs):
         """
@@ -414,7 +413,7 @@ class Collection(object):
         return self.metabase[dimension].unique().tolist()
     @property
     def bulk_dimensions(self):
-        df = self.loadTableDimensions()
+        df = self.loadTable('dic')
         kname = settings.BULK_DIC_NAMES['Name']
         try:
             # note the call to df[0] since there is one table only in the page
@@ -456,6 +455,26 @@ class Collection(object):
             else:                       data.append(cols[0].find('a').find(text=True))
         return data    
  
+    #/************************************************************************/
+    def __getitem__(self, item):
+        if not isinstance(item, str):
+            raise EurobaseError('wrong type for ITEM parameter')
+        if item in self.dimensions:
+            return self.__dimensions[item]
+        elif item in self.datasets:
+            return self.__datasets[item]
+    def __setitem__(self, item, value):
+        if not isinstance(item, str):
+            raise EurobaseError('wrong type for ITEM parameter')
+        if item in self.dimensions:
+            self.__dimensions[item] = value
+        elif item in self.datasets:
+            self.__datasets[item] = value
+    def __contains__(self, item):
+        if not isinstance(item, str):
+            raise EurobaseError('wrong type for ITEM parameter')
+        return item in self.dimensions or item in self.datasets
+
     #/************************************************************************/
     @staticmethod
     def __check_member(member, members):
