@@ -38,7 +38,7 @@ Basic class for common request operations
 # IMPORT STATEMENTS
 #==============================================================================
 
-import os 
+import os, sys
 import warnings
 import time
    
@@ -394,7 +394,7 @@ class Session(object):
         time_out = kwargs.get('time_out') or self.time_out or 0
         force_download = kwargs.get('force_download') or self.force_download or False
         pathname = self.__build_pathname(url, cache)
-        if force_download or not self.__is_cached(pathname, time_out):
+        if force_download or not self.is_cached(pathname, time_out):
             response = self.get_response(url)
             html = response.text
             if cache is not None:
@@ -402,11 +402,11 @@ class Session(object):
                     os.makedirs(cache)
                 elif not os.path.isdir(cache):
                     raise EurobaseError('cache {} is not a directory'.format(cache))
-                self.__write_to_cache(pathname, html)
+                self.__write_to_pathname(pathname, html)
         else:
             if not os.path.exists(cache) or not os.path.isdir(cache):
                 raise EurobaseError('cache {} is not a directory'.format(cache))
-            html = self.__read_from_cache(pathname)
+            html = self.__read_from_pathname(pathname)
         return pathname, html
     @staticmethod
     def __build_pathname(url, cache):
@@ -419,47 +419,75 @@ class Session(object):
             pathname = os.path.join(cache, pathname)
         return pathname
     @staticmethod
-    def __write_to_cache(pathname, content):
-        """write content to pathname
-        :param pathname:
-        :param content:
+    def __write_to_pathname(path, content):
+        """Write content to pathname
         """
-        with open(pathname, 'w') as f:
+        with open(path, 'w') as f:
             f.write(content)
             f.close()  
         return
     @staticmethod
-    def __read_from_cache(pathname):
-        """it reads content from pathname
+    def __dump_to_pathname(path, content, protocol=2):
+        """Dump content to path
+        """
+        with open(path, 'wb') as f:
+            pickle.dump(content, f, protocol=protocol)
+            f.close()  
+        return
+    @staticmethod
+    def __read_from_pathname(path):
+        """it reads content from path
         :param pathname:
         """
-        with open(pathname, 'r') as f:
+        with open(path, 'r') as f:
             content = f.read()
             f.close()
         return content
     @staticmethod
-    def __is_cached(pathname, time_out):
-        if not os.path.exists(pathname):
-            resp = False
-        elif time_out is 0:
-            resp = False
-        elif time_out is None:
-            resp = True
-        else:
-            cur = time.time()
-            mtime = os.stat(pathname).st_mtime
-            # print("last modified: %s" % time.ctime(mtime))
-            resp = cur - mtime < time_out
-        return resp
+    def __load_from_pathname(path):
+        """Load content from path
+        """
+        with open(path, 'rb') as f:
+            try:
+                content = pickle.load(f, encoding="ascii", errors="replace")
+            except TypeError:
+                content = pickle.load(f)
+            f.close()
+        return content
 
     #/************************************************************************/
+    @staticmethod
+    def __default_cache():
+        """
+        Inspired by Python package `mod:wbdata`: default path defined for `property:path` 
+        property of `class:Cache` class.
+        """
+        platform = sys.platform
+        if platform.startswith("win"): # windows
+            basedir = os.getenv("LOCALAPPDATA",os.getenv("APPDATA",os.path.expanduser("~")))
+        elif platform.startswith("darwin"): # Mac OS
+            basedir = os.path.expanduser("~/Library/Caches")
+        else:
+            basedir = os.getenv("XDG_CACHE_HOME",os.path.expanduser("~/.cache"))
+        return os.path.join(basedir, settings.PACKAGE)    
     def is_cached(self, url):
         """check if url exists
         :param url:
         :returns: True if the file can be retrieved from the disk (cache)
         """
         pathname = self.__build_pathname(url, self.cache)
-        return self.__is_cached(pathname, self.time_out)
+        if not os.path.exists(pathname):
+            resp = False
+        elif self.time_out is 0:
+            resp = False
+        elif self.time_out is None:
+            resp = True
+        else:
+            cur = time.time()
+            mtime = os.stat(pathname).st_mtime
+            # print("last modified: %s" % time.ctime(mtime))
+            resp = cur - mtime < self.time_out
+        return resp
         
     #/************************************************************************/
     @classmethod
