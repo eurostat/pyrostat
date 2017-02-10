@@ -88,7 +88,7 @@ BULK_BASE_EXT   = 'txt'
 BULK_BASE_ZIP   = 'gz' 
 """
 """
-BULK_BASE_NAMES = {'dataset':'dataset', 'dimension':'dimension', 'label':'label'} # should be a list
+BULK_BASE_NAMES = {'data':'dataset', 'dic':'dimension', 'label':'label'} # should be a list
 """
 """ # note: DO NOT MODIFY ... or also modify Collection.__get_member accordingly
 BULK_TOC_FILE   = 'table_of_contents'
@@ -123,3 +123,5 @@ KW_DEFAULT      = 'default'
 BS_PARSERS      = ("html.parser","html5lib","lxml","xml")
 """
 """
+
+EXCEPTIONS          = {}

@@ -4,7 +4,9 @@
 """
 .. api.py
 
-Tools for Eurostat data collections upload
+Tools for data collections download from 
+`Eurostat online database <http://ec.europa.eu/eurostat>`_
+together with search and manipulation utilities.
 
 **About**
 
@@ -32,6 +34,9 @@ Tools for Eurostat data collections upload
                 :mod:`numpy`, :mod:`scipy`, :mod:`matplotlib`, :mod:`pylab`,                        \
                 :mod:`pickle`, :mod:`cPickle`
 
+**See also**
+https://github.com/ropengov/eurostat
+                
 **Contents**
 """
 

@@ -3,7 +3,9 @@
 """
 .. collection.py
 
-Basic class for online database (dimensions+datasets) definitions
+Basic class used for the definition and retrieval of online collections, e.g. 
+dimensions and datasets, from the 
+`Eurostat online database <http://ec.europa.eu/eurostat>`_.
 
 **About**
 
@@ -15,21 +17,19 @@ Basic class for online database (dimensions+datasets) definitions
 
 **Description**
 
+
 **Usage**
 
-    >>> <put_here_an_example>
+    >>> from collection import Collection
     
 **Dependencies**
 
 *call*:         :mod:`settings`, :mod:`request`, :mod:`collections`
 
-*require*:      <put_here_required_modules>
-                :mod:`os`, :mod:`sys`, :mod:`string`, :mod:`inspect`, :mod:`warnings`, \ 
-                :mod:`re`, :mod:`math`, :mod:`operator`, :mod:`itertools`, :mod:`collections`
+*require*:      :mod:`os`, :mod:`sys`, :mod:`string`, :mod:`warnings`, \ 
+                :mod:`itertools`, :mod:`collections`, :mod:`numpy`
                 
-*optional*:     <put_here_optional_modules>
-                :mod:`numpy`, :mod:`scipy`, :mod:`matplotlib`, :mod:`pylab`,                        \
-                :mod:`pickle`, :mod:`cPickle`
+*optional*:     :mod:`pandas`, :mod:`lxml`
 
 **Contents**
 """
@@ -48,7 +48,8 @@ import numpy as np
 
 try:
     import pandas as pd
-except ImportError:          
+except ImportError:     
+    pd = None     
     pass
 
 try:                                
@@ -81,9 +82,27 @@ class Collection(object):
     
     #/************************************************************************/
     def __init__(self, **kwargs):
-        """
-        :param cache: directory where to store downloaded files
-        :param expire: how many seconds to store file on disk, None is infinity, 0 for not to store
+        """Initialisation of a :class:`Collection` instance; pass all domain/query
+        items and  set all session.
+
+            >>> x = {{FETCH}}(**kwargs)
+            
+        Keyword Arguments
+        -----------------  
+        `domain` : str
+            keys used to set various credentials, e.g. key, secret, token, and t
+        `query` : str
+        `lang` : str
+        `sort` : int
+        
+        Keyword Arguments used for :mod:`session` setting
+        -------------------------------------------------  
+        `cache`: str
+            directory where to store downloaded files
+        `time_out`: 
+            number of seconds considered to store file on disk, None is infinity, 
+            0 for not to store; default
+        `force_download` : bool
         """
         self.__session      = None
         self.__url          = None
@@ -110,8 +129,12 @@ class Collection(object):
     #/************************************************************************/
     @property
     def domain(self):
+        """Eurostat domain attribute (:data:`getter`/:data:`setter`) used through
+        a session launched to connect to _Eurostat_ bulk 
+        data webservice. 
+        """
         return self.__domain
-    @domain.setter
+    @domain.setter#analysis:ignore
     def domain(self, domain):
         if not isinstance(domain, str):
             raise EurobaseError('wrong type for DOMAIN parameter')
@@ -120,6 +143,9 @@ class Collection(object):
     #/************************************************************************/
     @property
     def query(self):
+        """Query attribute (:data:`getter`/:data:`setter`) attached to the domain
+        and used througout a launched session. 
+        """
         return self.__query
     @query.setter
     def query(self, query):
@@ -130,6 +156,10 @@ class Collection(object):
     #/************************************************************************/
     @property
     def lang(self):
+        """Attribute (:data:`getter`/:data:`setter`) defining the language of the
+        objects (ulrs and files) returned when connecting througout a session. 
+        See :data:`settings.LANGS` for the list of currently accepted languages. 
+        """
         return self.__lang
     @lang.setter
     def lang(self, lang):
@@ -142,6 +172,9 @@ class Collection(object):
     #/************************************************************************/
     @property
     def sort(self):
+        """Sort attribute (:data:`getter`/:data:`setter`) used througout a session 
+        launched to query _Eurostat_ bulk data collection. 
+        """
         return self.__sort
     @sort.setter
     def sort(self, sort):
@@ -154,11 +187,17 @@ class Collection(object):
     #/************************************************************************/
     @property
     def metabase(self):
+        """Metabase attribute (:data:`getter`/:data:`setter`) storing, in a table,
+        the information of _Eurostat_ bulk download metabase.
+        """
         return self.__metabase
     @metabase.setter
     def metabase(self, metabase):
         if isinstance(metabase, np.array):
-            metabase = pd.DataFrame(data=metabase)
+            if pd is not None:
+                metabase = pd.DataFrame(data=metabase)
+            else:
+                pass
         elif not isinstance(metabase, pd.DataFrame):
             raise EurobaseError('wrong value for METABASE parameter')
         self.__metabase = metabase
@@ -166,6 +205,10 @@ class Collection(object):
     #/************************************************************************/
     @property
     def dimensions(self):
+        """Dimensions attribute (:data:`getter`/:data:`setter`) storing, in a 
+        dictionary, the dimensions (dictionary fields) that have been loaded from
+        the _Eurostat_ bulk download website.
+        """
         return self.__dimensions.keys()
     @dimensions.setter
     def dimensions(self, dimensions):
@@ -182,6 +225,10 @@ class Collection(object):
     #/************************************************************************/
     @property
     def datasets(self):
+        """Datasets attribute (:data:`getter`/:data:`setter`) storing, in a 
+        dictionary, the datasets (dictionary fields) that have been loaded from
+        the *Eurostat bulk download* website in the :class:`{Collection}` instance.
+        """
         # return [items for lists in self.__datasets.values() for items in lists]
         return self.__datasets.keys()
     @datasets.setter
@@ -198,11 +245,21 @@ class Collection(object):
 
     #/************************************************************************/
     def setSession(self, **kwargs):
+        """Set the session of the :class:`{Collection}` instance.
+        
+            >>> session = C.setSession(**kwargs)
+        """
         try:
             self.__session = Session(**kwargs)
         except:
             raise EurobaseError('wrong definition for SESSION parameter')
     def getSession(self, **kwargs):
+        """Retrieve the session of the :class:`{Collection}` instance, or define
+        a new one when arguments are passed.
+        
+            >>> session = C.getSession(**kwargs)
+
+        """
         try:
             session = Session(**kwargs)
         except:
@@ -215,7 +272,37 @@ class Collection(object):
  
     #/************************************************************************/
     @staticmethod
-    def update_url(domain, **kwargs):
+    def update_url(url, **kwargs):
+        """Build (update) an URL using a predefined URL (e.g., a domain) and a set
+        of query arguments encoded as key/value pairs.
+        
+            >>> url = update_url(domain, **kwargs)
+         
+        Argument
+        --------
+        url : str
+            basic url path to be extended.
+           
+        Keyword Arguments
+        -----------------  
+        kwargs : dict
+            any other regularly query arguments to be encoded in the url path, e.g.,
+            in something like :data:`key=value` where :data:`key` and :data:`value` 
+            are actually the key/value pairs of :data:`kwargs`; among other possible
+            queries, :data:`sort` and :data:`lang` are accepted; note that :data:`lang` 
+            is used to set the language subdomain; when passed (i.e. :data:`lang` is
+            not :data:`None`), the path of the url will be extended with the language
+            value: :data:`url/lang`.
+            
+        Returns
+        -------
+        url : str
+            url path of the form :data:`domain/{query}
+            
+        See also
+        --------
+        :meth:`Session.build_url`
+        """
         if kwargs == {}:
             return domain
         # set parameters
@@ -386,7 +473,7 @@ class Collection(object):
     def meta_datasets(self):
         if self.metabase is None:
             raise EurobaseError('no METABASE data found') 
-        dataset = settings.BULK_BASE_NAMES['dataset']
+        dataset = settings.BULK_BASE_NAMES['data']
         return self.metabase[dataset].unique().tolist()
     @property
     def bulk_datasets(self):
@@ -409,7 +496,7 @@ class Collection(object):
     def meta_dimensions(self):
         if self.metabase is None:
             raise EurobaseError('no METABASE data found') 
-        dimension = settings.BULK_BASE_NAMES['dimension']
+        dimension = settings.BULK_BASE_NAMES['dic']
         return self.metabase[dimension].unique().tolist()
     @property
     def bulk_dimensions(self):
@@ -454,7 +541,7 @@ class Collection(object):
             if cols == [] or i <= 2:    continue
             else:                       data.append(cols[0].find('a').find(text=True))
         return data    
- 
+        
     #/************************************************************************/
     def __getitem__(self, item):
         if not isinstance(item, str):
@@ -490,44 +577,50 @@ class Collection(object):
         return self.__check_member(dataset, self.datasets)
     
     #/************************************************************************/
-    def setDatasets(self, dataset):
-        self.__datasets.update({dataset: self.getDimensions(self, dataset)})
-    def setDimensions(self, dimension, **kwargs):
-        self.__dimensions.update({dimension: self.getLabels(self, dimension)})
-    @staticmethod
-    def __set_member(member, **kwargs):
-        pass
-    
-    #/************************************************************************/
-    def getDatasets(self, dimension, **kwargs):
-        kwargs.update({'dimension': dimension})
-        return self.__get_member('dataset', self.metabase, **kwargs)
-    def getDimensions(self, dataset, **kwargs):
-        kwargs.update({'dataset': dataset})
-        return self.__get_member('dimension', self.metabase, **kwargs)
-    def getLabels(self, dimension, **kwargs):
-        kwargs.update({'dimension': dimension})
-        return self.__get_member('label', self.metabase, **kwargs)
+    def getDataset(self, dataset):
+        return self.__get_member('dic', self.metabase, 'data'=dataset)
+    def getDimension(self, dimension):
+        return self.__get_member('label', self.metabase, 'dic'=dimension)
     @staticmethod
     def __get_member(member, metabase, **kwargs):
         if metabase is None:
             raise EurobaseError('metabase data not found')
         members = settings.BULK_BASE_NAMES
-        # note that we have BULK_BASE_NAMES = ['dataset', 'dimension', 'label']
+        # note that we have BULK_BASE_NAMES = {'data':'dataset', 'dic':'dimension', 'label':'label'}
         if member not in members:
             raise EurobaseError('member value not recognised - '
-                                'must be any string in: {}'.format(members))
+                                'must be any string in: {}'.format(members.keys()))
         members.pop(member)
         grpby, fltby = [], []
-        [grpby.append(m) or fltby.append(kwargs.get(m)) for m in members   \
+        [grpby.append(members[m]) or fltby.append(kwargs.get(m)) for m in members   \
              if m in kwargs]
         group = metabase.groupby(grpby).get_group(tuple(fltby))
         return group[member].unique().tolist()
+    def setDataset(self, dataset):
+        self.__datasets.update({dataset: self.getDataset(dataset)})
+    def setDimension(self, dimension):
+        self.__dimensions.update({dimension: self.getDimension(dimension)})
+    @staticmethod
+    def __set_member(member, **kwargs):
+        pass
+    
+    #/************************************************************************/
+    def getAllDatasets(self, dimension, **kwargs):
+        return self.__get_member('data', self.metabase, 'dic'=dimension)
+    def getAllDimensions(self, dataset, **kwargs):
+        return self.__get_member('dic', self.metabase, 'data'=dataset)
+    def getAllLabels(self, dimension, **kwargs):
+        return self.__get_member('label', self.metabase, 'dic'=dimension)
      
     #/************************************************************************/
+    @property
+    def geocode(self):
+        return self.getDimension('geo')
+        
+        #/************************************************************************/
     def setMetabase(self, **kwargs):
-        self.__metabase = self.read_metabase(**kwargs)
-    def read_metabase(self, **kwargs):
+        self.__metabase = self.readMetabase(**kwargs)
+    def readMetabase(self, **kwargs):
         basefile = '{base}.{ext}'.format(base=settings.BULK_BASE_FILE, ext=settings.BULK_BASE_EXT)
         if settings.BULK_BASE_ZIP != '':
             basefile = '{base}.{zip}'.format(base=basefile, zip=settings.BULK_BASE_ZIP)
@@ -547,9 +640,15 @@ class Collection(object):
         return metabase
 
     #/************************************************************************/
+    def search(self, regex):
+        mask = np.column_stack([self.metabase[col].str.contains(regex, na=False) \
+                                for col in self.metadata])
+        res = self.metabase.loc[mask.any(axis=1)]
+        return res
+    #/************************************************************************/
     def setTOC(self, **kwargs):
-        self.__toc = self.read_toc(**kwargs)
-    def read_toc(self, **kwargs):
+        self.__toc = self.readToc(**kwargs)
+    def readToc(self, **kwargs):
         """
         Example: http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=table_of_contents.xml
         """

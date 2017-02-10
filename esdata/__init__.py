@@ -31,7 +31,7 @@ __all__ = ['settings', 'session', 'collection', 'api']#analysis:ignore
 #==============================================================================
 
 metadata = dict([
-                ('project', 'EuroBase'),
+                ('project', 'esdata'),
                 ('date', 'Wed Dec  7 23:52:39 2016'),
                 ('url', 'https://github.com/gjacopo/eurobase'),
                 ('organization', 'European Union'),
