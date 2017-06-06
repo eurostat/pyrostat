@@ -50,7 +50,6 @@ try:
     import pandas as pd
 except ImportError:     
     pd = None     
-    pass
 
 try:                                
     import lxml
@@ -85,7 +84,7 @@ class Collection(object):
         """Initialisation of a :class:`Collection` instance; pass all domain/query
         items and  set all session.
 
-            >>> x = {{FETCH}}(**kwargs)
+            >>> x = Collection(**kwargs)
             
         Keyword Arguments
         -----------------  
@@ -325,7 +324,7 @@ class Collection(object):
     def setURL(self, **kwargs):
         """Set the query URL to *Bulk download* web service.
         
-            >>> url = Collections._build_url(domain, **kwargs)
+            >>> url = Collections.setURL(**kwargs)
            
         Keyword Arguments
         -----------------

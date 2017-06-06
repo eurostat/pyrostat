@@ -80,7 +80,7 @@ except:
 try:
     import pandas as pd
 except ImportError:          
-    class pandas:
+    class pd:
         def read_table(*args, **kwargs): 
             raise IOError
 
@@ -245,6 +245,8 @@ class Session(object):
         if 'query' in kwargs:      
             url = "{url}/{query}".format(url=url,query=kwargs.pop('query'))
         if kwargs != {}:
+            #_izip_replicate = lambda d : [(k,i) if isinstance(d[k], (tuple,list))        \
+            #        else (k, d[k]) for k in d for i in d[k]]
             _izip_replicate = lambda d : [[(k,i) for i in d[k]] if isinstance(d[k], (tuple,list))        \
                 else (k, d[k])  for k in d]          
             #def _izip_replicate(d):
