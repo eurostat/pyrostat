@@ -275,6 +275,7 @@ class Session(object):
             
         Arguments
         ---------
+        url : str
 
         Returns
         -------
@@ -329,12 +330,14 @@ class Session(object):
             
         Arguments
         ---------
-
+        url : str
+            
         Returns
         -------
 
         Raises
         ------
+        EurobaseError
 
         Note
         ----
@@ -496,7 +499,7 @@ class Session(object):
     def read_soup_table(cls, html, **kwargs): # read vegetables
         """
         
-            >>> 
+            >>> read_soup_table(cls, html, **kwargs)
             
         Arguments
         ---------

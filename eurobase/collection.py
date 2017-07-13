@@ -4,8 +4,7 @@
 .. collection.py
 
 Basic class used for the definition and retrieval of online collections, e.g. 
-dimensions and datasets, from the 
-`Eurostat online database <http://ec.europa.eu/eurostat>`_.
+dimensions and datasets, from `Eurostat online database <http://ec.europa.eu/eurostat>`_.
 
 **About**
 
@@ -93,6 +92,8 @@ class Collection(object):
         `query` : str
         `lang` : str
         `sort` : int
+        `dimension` :
+        `dataset` :
         
         Keyword Arguments used for :mod:`session` setting
         -------------------------------------------------  
@@ -112,11 +113,11 @@ class Collection(object):
         self.__lang         = settings.DEF_LANG
         self.__sort         = settings.DEF_SORT
         self.__query        = settings.BULK_QUERY
-        self.__dimensions   = {}
-        self.__datasets     = {} # dict([(a, []) for a in list(string.ascii_lowercase)])
+        self.__dimension    = {}
+        self.__dataset      = {} # dict([(a, []) for a in list(string.ascii_lowercase)])
         # update
         if kwargs != {}:
-            attrs = ( 'domain','query','lang','sort','dimensions','datasets' )
+            attrs = ( 'domain','query','lang','sort','dimension','dataset' )
             for attr in list(set(attrs).intersection(kwargs.keys())):
                 try:
                     setattr(self, '{}'.format(attr), kwargs.pop(attr))
@@ -129,8 +130,7 @@ class Collection(object):
     @property
     def domain(self):
         """Eurostat domain attribute (:data:`getter`/:data:`setter`) used through
-        a session launched to connect to _Eurostat_ bulk 
-        data webservice. 
+        a session launched to connect to _Eurostat_ bulk data webservice. 
         """
         return self.__domain
     @domain.setter#analysis:ignore
@@ -156,7 +156,7 @@ class Collection(object):
     @property
     def lang(self):
         """Attribute (:data:`getter`/:data:`setter`) defining the language of the
-        objects (ulrs and files) returned when connecting througout a session. 
+        objects (urls and files) returned when connecting througout a session. 
         See :data:`settings.LANGS` for the list of currently accepted languages. 
         """
         return self.__lang
@@ -203,44 +203,60 @@ class Collection(object):
 
     #/************************************************************************/
     @property
-    def dimensions(self):
-        """Dimensions attribute (:data:`getter`/:data:`setter`) storing, in a 
-        dictionary, the dimensions (dictionary fields) that have been loaded from
-        the _Eurostat_ bulk download website.
+    def toc(self):
+        """TOC attribute (:data:`getter`/:data:`setter`) storing, the table of 
+        contents hosted on _Eurostat_ bulk download metabase.
         """
-        return self.__dimensions.keys()
-    @dimensions.setter
-    def dimensions(self, dimensions):
-        if isinstance(dimensions, dict):
-            dimensions = dimensions
-        elif isinstance(dimensions, (list,tuple)):
-            dimensions = dict(zip_longest(list(dimensions),None))
-        elif isinstance(dimensions, str):
-            dimensions = {dimensions: None}
-        if not isinstance(dimensions, dict) or not all([isinstance(d,str) for d in dimensions]):
-            raise EurobaseError('wrong type for DIMENSIONS parameter')       
-        self.__dimensions = dimensions # not an update!
+        return self.__toc
+    @toc.setter
+    def toc(self, toc):
+        if isinstance(toc, np.array):
+            if pd is not None:
+                toc = pd.DataFrame(data=toc)
+            else:
+                pass
+        elif not isinstance(toc, pd.DataFrame):
+            raise EurobaseError('wrong value for TOC parameter')
+        self.__toc = toc
 
     #/************************************************************************/
     @property
-    def datasets(self):
-        """Datasets attribute (:data:`getter`/:data:`setter`) storing, in a 
+    def dimension(self):
+        """Dimension attribute (:data:`getter`/:data:`setter`) storing, in a 
+        dictionary, the dimensions (dictionary fields) that have been loaded from
+        the _Eurostat_ bulk download website.
+        """
+        return self.__dimension.keys()
+    @dimension.setter
+    def dimension(self, dimension):
+        #if isinstance(dimension, dict):    do nothing 
+        if isinstance(dimension, (list,tuple)):
+            dimension = dict(zip_longest(list(dimension),None))
+        elif isinstance(dimension, str):
+            dimension = {dimension: None}
+        if not isinstance(dimension, dict) or not all([isinstance(d,str) for d in dimension]):
+            raise EurobaseError('wrong type for DIMENSION parameter')       
+        self.__dimension = dimension # not an update!
+
+    #/************************************************************************/
+    @property
+    def dataset(self):
+        """Dataset attribute (:data:`getter`/:data:`setter`) storing, in a 
         dictionary, the datasets (dictionary fields) that have been loaded from
         the *Eurostat bulk download* website in the :class:`{Collection}` instance.
         """
-        # return [items for lists in self.__datasets.values() for items in lists]
-        return self.__datasets.keys()
-    @datasets.setter
-    def datasets(self, datasets):
-        if isinstance(datasets, dict):
-            datasets = datasets
-        elif isinstance(datasets, (list,tuple)):
-            datasets = dict(zip_longest(list(datasets),None))
-        elif isinstance(datasets, str):
-            datasets = {datasets: None}
-        if not isinstance(datasets, dict) or not all([isinstance(d,str) for d in datasets]):
+        # return [items for lists in self.__dataset.values() for items in lists]
+        return self.__dataset.keys()
+    @dataset.setter
+    def dataset(self, dataset):
+        # if isinstance(dataset, dict):   do nothing
+        if isinstance(dataset, (list,tuple)):
+            dataset = dict(zip_longest(list(dataset),None))
+        elif isinstance(dataset, str):
+            dataset = {dataset: None}
+        if not isinstance(dataset, dict) or not all([isinstance(d,str) for d in dataset]):
             raise EurobaseError('wrong type for DATASETS parameter')       
-        self.__datasets = datasets # not an update!
+        self.__dataset = dataset # not an update!
 
     #/************************************************************************/
     def setSession(self, **kwargs):
@@ -271,11 +287,11 @@ class Collection(object):
  
     #/************************************************************************/
     @staticmethod
-    def update_url(url, **kwargs):
+    def update_url(domain, **kwargs):
         """Build (update) an URL using a predefined URL (e.g., a domain) and a set
         of query arguments encoded as key/value pairs.
         
-            >>> url = update_url(domain, **kwargs)
+            >>> url = C.update_url(domain, **kwargs)
          
         Argument
         --------
@@ -324,7 +340,7 @@ class Collection(object):
     def setURL(self, **kwargs):
         """Set the query URL to *Bulk download* web service.
         
-            >>> url = Collections.setURL(**kwargs)
+            >>> url = C.setURL(**kwargs)
            
         Keyword Arguments
         -----------------
@@ -368,6 +384,8 @@ class Collection(object):
             
     #/************************************************************************/
     def last_update(self, **kwargs):
+        """Retrieve the time a table (dictionary or dataset) was last updated.
+        """
         dimension, dataset = [kwargs.get(key) for key in ('dic','data')]
         if dataset is None and dimension is None:
             raise EurobaseError('one of the parameters DIC or DATA needs to be set')
@@ -414,14 +432,14 @@ class Collection(object):
         if not key in ('dic','data'):
             raise EurobaseError('keyword parameter {} not recognised'.format(key))
         elif key == 'dic':
-            if not hasattr(self.__dimensions, '_table_'):
-                self.__dimensions['_table_'] = self.readTable(key)
-            return self.__dimensions['_table_']
+            if not hasattr(self.__dimension, '_table_'):
+                self.__dimension['_table_'] = self.readTable(key)
+            return self.__dimension['_table_']
         else:
-            if not hasattr(self.__datasets, '_table_')                      \
-                and  not hasattr(self.__datasets['_table_'], alpha):
-                    self.__datasets['_table_'][alpha] = self.readTable(key, alpha)
-            return self.__datasets['_table_'][alpha]
+            if not hasattr(self.__dataset, '_table_')                      \
+                and  not hasattr(self.__dataset['_table_'], alpha):
+                    self.__dataset['_table_'][alpha] = self.readTable(key, alpha)
+            return self.__dataset['_table_'][alpha]
     def readBulk(self, **kwargs):
         """
         dimension example:
@@ -469,13 +487,13 @@ class Collection(object):
 
     #/************************************************************************/
     @property
-    def meta_datasets(self):
+    def meta_dataset(self):
         if self.metabase is None:
             raise EurobaseError('no METABASE data found') 
         dataset = settings.BULK_BASE_NAMES['data']
         return self.metabase[dataset].unique().tolist()
     @property
-    def bulk_datasets(self):
+    def bulk_dataset(self):
         datasets = []
         # url = self.update_url(self.url, sort=self.sort, dir=settings.BULK_DATA_DIR)
         # kwargs = {'skiprows': [1], 'header': 0}
@@ -492,13 +510,13 @@ class Collection(object):
 
     #/************************************************************************/
     @property
-    def meta_dimensions(self):
+    def meta_dimension(self):
         if self.metabase is None:
             raise EurobaseError('no METABASE data found') 
         dimension = settings.BULK_BASE_NAMES['dic']
         return self.metabase[dimension].unique().tolist()
     @property
-    def bulk_dimensions(self):
+    def bulk_dimension(self):
         df = self.loadTable('dic')
         kname = settings.BULK_DIC_NAMES['Name']
         try:
@@ -509,7 +527,7 @@ class Collection(object):
         return dimensions
 
     @property
-    def __obsolete_bulk_datasets(self):
+    def __obsolete_bulk_dataset(self):
         datasets = []
         url = self.update_url(self.url, sort=self.sort, dir=settings.BULK_DATA_DIR)
         for alpha in list(string.ascii_lowercase):
@@ -521,7 +539,7 @@ class Collection(object):
             datasets += [d.split('.')[0] for d in self.__filter_table(rows)]
         return datasets
     @property
-    def __obsolete_bulk_dimensions(self):
+    def __obsolete_bulk_dimension(self):
         url = self.update_url(self.url, lang=self.lang, sort=self.sort, dir=settings.BULK_DIC_DIR)
         _, html = self.session.load_page(url)
         if html is None or html == '':
@@ -545,21 +563,21 @@ class Collection(object):
     def __getitem__(self, item):
         if not isinstance(item, str):
             raise EurobaseError('wrong type for ITEM parameter')
-        if item in self.dimensions:
-            return self.__dimensions[item]
-        elif item in self.datasets:
-            return self.__datasets[item]
+        if item in self.dimension:
+            return self.__dimension[item]
+        elif item in self.dataset:
+            return self.__dataset[item]
     def __setitem__(self, item, value):
         if not isinstance(item, str):
             raise EurobaseError('wrong type for ITEM parameter')
-        if item in self.dimensions:
-            self.__dimensions[item] = value
-        elif item in self.datasets:
-            self.__datasets[item] = value
+        if item in self.dimension:
+            self.__dimension[item] = value
+        elif item in self.dataset:
+            self.__dataset[item] = value
     def __contains__(self, item):
         if not isinstance(item, str):
             raise EurobaseError('wrong type for ITEM parameter')
-        return item in self.dimensions or item in self.datasets
+        return item in self.dimension or item in self.dataset
 
     #/************************************************************************/
     @staticmethod
@@ -571,46 +589,88 @@ class Collection(object):
         else:                       
             return False
     def check_dimension(self, dimension):
-        return self.__check_member(dimension, self.dimensions)
+        return self.__check_member(dimension, self.dimension)
     def check_dataset(self, dataset):
-        return self.__check_member(dataset, self.datasets)
+        return self.__check_member(dataset, self.dataset)
     
     #/************************************************************************/
-    def getDataset(self, dataset):
-        return self.__get_member('dic', self.metabase, 'data'=dataset)
-    def getDimension(self, dimension):
-        return self.__get_member('label', self.metabase, 'dic'=dimension)
     @staticmethod
     def __get_member(member, metabase, **kwargs):
         if metabase is None:
-            raise EurobaseError('metabase data not found')
-        members = settings.BULK_BASE_NAMES
-        # note that we have BULK_BASE_NAMES = {'data':'dataset', 'dic':'dimension', 'label':'label'}
+            raise EurobaseError('metabase data not found - load the file from Eurobase')
+        members = settings.BULK_BASE_NAMES # ('data', 'dic', 'label')
         if member not in members:
             raise EurobaseError('member value not recognised - '
                                 'must be any string in: {}'.format(members.keys()))
-        members.pop(member)
-        grpby, fltby = [], []
-        [grpby.append(members[m]) or fltby.append(kwargs.get(m)) for m in members   \
-             if m in kwargs]
-        group = metabase.groupby(grpby).get_group(tuple(fltby))
+        elif set(kwargs.keys()).intersection([member]) != set(): # not empty
+            raise EurobaseError('member value should not be passed as a keyword argument')
+        grpby = list(set(kwargs.keys()).intersection(set(members)))
+        if grpby != []:
+            fltby = tuple([kwargs.get(k) for k in grpby]) # preserve the order
+            if len(grpby) == 1:
+                grpby, fltby = grpby[0], fltby[0]
+            group = metabase.groupby(grpby).get_group(fltby)
+        else:
+            group = metabase
         return group[member].unique().tolist()
-    def setDataset(self, dataset):
-        self.__datasets.update({dataset: self.getDataset(dataset)})
-    def setDimension(self, dimension):
-        self.__dimensions.update({dimension: self.getDimension(dimension)})
     @staticmethod
     def __set_member(member, **kwargs):
         pass
     
     #/************************************************************************/
-    def getAllDatasets(self, dimension, **kwargs):
-        return self.__get_member('data', self.metabase, 'dic'=dimension)
-    def getAllDimensions(self, dataset, **kwargs):
-        return self.__get_member('dic', self.metabase, 'data'=dataset)
+    def getDataset(self, dataset):
+        return self.__get_member('dic', self.metabase, data=dataset)
+    def getDimension(self, dimension):
+        return self.__get_member('label', self.metabase, dic=dimension)
+    def setDataset(self, dataset):
+        self.__datasets.update({dataset: self.getDataset(dataset)})
+    def setDimension(self, dimension):
+        self.__dimensions.update({dimension: self.getDimension(dimension)})
+
+    #/************************************************************************/
+    def getAllDatasets(self, dimension = None):
+        """Retrieve all the datasets that are using a given dimension.
+        """
+        if dimension is None:
+            return self.__get_member('data', self.metabase)
+        else:
+            return self.__get_member('data', self.metabase, dic=dimension)
+    def getAllDimensions(self, dataset):
+        """Retrieve all the dimensions used to define a given dataset.
+        """
+        return self.__get_member('dic', self.metabase, data=dataset)
     def getAllLabels(self, dimension, **kwargs):
-        return self.__get_member('label', self.metabase, 'dic'=dimension)
-     
+        """Retrieve all the labels of a given dimension and possibly used
+        by a given dataset.
+        """
+        return self.__get_member('label', self.metabase, dic=dimension, **kwargs)
+ 
+    #/************************************************************************/
+    def checkDataset(self, dataset):
+        """Check whether a dataset exists in Eurostat database.
+        
+        Argument
+        --------
+        name : str
+            string defining a dataset.
+            
+        Returns
+        -------
+        res : bool
+            boolean answer (`True`/`False`) to the existence of the dataset `name`.
+        """
+        # return dataset in self.getAllDatasets(dimension)
+        return dataset in self.getAllDatasets()
+    def checkDimensionInDataset(self, dimension, dataset):
+        """Check whether some dimension is used by a given dataset.
+        """
+        # return dataset in self.getAllDatasets(dimension)
+        return dimension in self.getAllDimensions(dataset)
+    def checkLabelInDimension(self, label, dimension, **kwargs):
+        """Check whether some label is used by a given dimension.
+        """
+        return label in self.getAllLabels(dimension, **kwargs)
+        
     #/************************************************************************/
     @property
     def geocode(self):
@@ -625,10 +685,10 @@ class Collection(object):
             basefile = '{base}.{zip}'.format(base=basefile, zip=settings.BULK_BASE_ZIP)
         url = self.update_url(self.url, sort=self.sort, file=basefile)
         kwargs.update({'header': None, # no effect...
-                       'names': self.BULK_BASE_NAMES})
+                       'names': settings.BULK_BASE_NAMES})
         # !!! it seems there is a problem with compression='infer' since it is 
         # not working well !!!
-        dcomp = {'gz': 'gzip', 'bz2': 'bz2', 'zip': 'zip' }
+        dcomp = {'gz': 'gzip', 'bz2': 'bz2', 'zip': 'zip'}
         #compression =[dcomp[ext] for ext in dcomp if settings.BULK_BASE_EXT.endswith(ext)][0]
         kwargs.update({'compression': dcomp[settings.BULK_BASE_ZIP]})
         # run the pandas.read_table method
@@ -644,6 +704,7 @@ class Collection(object):
                                 for col in self.metadata])
         res = self.metabase.loc[mask.any(axis=1)]
         return res
+        
     #/************************************************************************/
     def setTOC(self, **kwargs):
         self.__toc = self.readToc(**kwargs)
@@ -666,16 +727,16 @@ class Collection(object):
             if lang not in settings.LANGS:   
                 raise EurobaseError('language LANG not recognised') 
         if ext == 'xml':
-            basefile = '{base}.xml'.format(base=settings.BULK_BASE_FILE)
+            tocfile = '{toc}.xml'.format(toc=settings.BULK_TOC_FILE)
         else:
-            basefile = '{base}_{lang}.{ext}'.format(base=settings.BULK_BASE_FILE, lang=lang, ext=ext)
+            tocfile = '{toc}_{lang}.{ext}'.format(toc=settings.BULK_TOC_FILE, lang=lang, ext=ext)
         if settings.BULK_TOC_ZIP != '':
-            basefile = '{base}.{zip}'.format(base=basefile, zip=settings.BULK_DIC_ZIP)
-        url = self.update_url(self.url, sort=self.sort, file=basefile)
+            tocfile = '{toc}.{zip}'.format(toc=tocfile, zip=settings.BULK_DIC_ZIP)
+        url = self.update_url(self.url, sort=self.sort, file=tocfile)
         kwargs.update({'header': 0})
         try:
             if ext == 'xml':
-                toc = self.session.read_html_table(url, **kwargs)
+                toc = self.session.read_html_table(url, **kwargs)                
                 toc = toc[0]
             else:
                 toc = self.session.read_url_table(url, **kwargs)
@@ -686,3 +747,27 @@ class Collection(object):
             toc.applymap(lambda x: x.strip())
         return toc
          
+    #/************************************************************************/
+    @staticmethod
+    def __get_content(member, toc, **kwargs):
+        if toc is None:
+            raise EurobaseError('table of contents not found - load the file from Eurobase')
+        code = toc['code']
+        if code[code.isin([member])].empty:
+            raise EurobaseError('member not found in codelist of table of contents')
+        return toc[code==member]
+        
+    #/************************************************************************/
+    def getTitle(self, dataset, **kwargs):
+        res = self.__get_content(dataset, self.toc, **kwargs)
+        ind = res.index.tolist()
+        return res['title'][ind[0]].lstrip().rstrip()
+        
+    #/************************************************************************/
+    def getPeriod(self, dataset, **kwargs):
+        res = self.__get_content(dataset, self.toc, **kwargs)
+        ind = res.index.tolist()
+        start = res['data start'][ind[0]]
+        end = res['data end'][ind[0]]
+        return [start, end]
+        
