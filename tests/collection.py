@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Jun  6 13:54:22 2017
+About
+-----
 
-@author: gjacopo
+*credits*:      `gjacopo <jacopo.grazzini@jrc.ec.europa.eu>`_ 
+
+*since*:        Tue Jun  6 13:54:22 2017
 """
 
 #==============================================================================
@@ -16,7 +19,7 @@ import datetime
 import math
 import re
 
-from eurobase import settings, collection
+from esdata import settings, collection
 from . import runtest as baseRuntest
 
 #/****************************************************************************/
