@@ -8,7 +8,7 @@ Tools for Eurostat data collections upload
 
 **About**
 
-*credits*:      `grazzja <jacopo.grazzini@ec.europa.eu>`_ 
+*credits*:      `gjacopo <jacopo.grazzini@ec.europa.eu>`_ 
 
 *version*:      0.1
 --
@@ -19,7 +19,7 @@ Tools for Eurostat data collections upload
 
 **Usage**
 
-    >>> import eurobase
+    >>> import esdata
     
 """
 
@@ -46,13 +46,13 @@ metadata = dict([
 # GLOBAL CLASSES/METHODS/VARIABLES
 #==============================================================================
 
-class EurobaseError(Exception):
+class ESDataError(Exception):
     """Base class for exceptions in this module."""
     def __init__(self, msg, expr=None):    
         self.msg = msg
         if expr is not None:    self.expr = expr
     def __str__(self):              return repr(self.msg)
-class EurobaseWarning(Warning):
+class ESDataWarning(Warning):
     """Base class for warnings in this module."""
     def __init__(self, msg, expr=None):    
         self.msg = msg

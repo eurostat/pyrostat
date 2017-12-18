@@ -8,7 +8,7 @@ Basic class for common request operations
 
 **About**
 
-*credits*:      `grazzja <jacopo.grazzini@ec.europa.eu>`_ 
+*credits*:      `gjacopo <jacopo.grazzini@ec.europa.eu>`_ 
 
 *version*:      0.1
 --
@@ -104,7 +104,7 @@ except ImportError:
 # GLOBAL CLASSES/METHODS/VARIABLES
 #==============================================================================
 
-from . import EurobaseWarning, EurobaseError
+from . import ESDataWarning, ESDataError
 from . import settings
 
 
@@ -129,7 +129,7 @@ class Session(object):
                 try:
                     setattr(self, '{}'.format(attr), kwargs.pop(attr))
                 except: 
-                    warnings.warn(EurobaseWarning('wrong attribute value {}'.format(attr.upper())))
+                    warnings.warn(ESDataWarning('wrong attribute value {}'.format(attr.upper())))
         # initialise
         self.set(**kwargs)
         
@@ -165,7 +165,7 @@ class Session(object):
     @cache.setter
     def cache(self, cache):
         if not isinstance(cache, str):
-            raise EurobaseError('wrong type for CACHE parameter')
+            raise ESDataError('wrong type for CACHE parameter')
         self.__cache = os.path.abspath(cache)
 
     #/************************************************************************/
@@ -175,9 +175,9 @@ class Session(object):
     @time_out.setter
     def time_out(self, time_out):
         if not isinstance(time_out, (int, datetime.timedelta)):
-            raise EurobaseError('wrong type for TIME_OUT parameter')
+            raise ESDataError('wrong type for TIME_OUT parameter')
         elif isinstance(time_out, int) and time_out<0:
-            raise EurobaseError('wrong setting for TIME_OUT parameter')
+            raise ESDataError('wrong setting for TIME_OUT parameter')
         self.__time_out = time_out
 
     #/************************************************************************/
@@ -187,7 +187,7 @@ class Session(object):
     @force_download.setter
     def force_download(self, force_download):
         if not isinstance(force_download, bool):
-            raise EurobaseError('wrong type for FORCE_DOWNLOAD parameter')
+            raise ESDataError('wrong type for FORCE_DOWNLOAD parameter')
         self.__force_download = force_download
         
     #/************************************************************************/
@@ -195,7 +195,7 @@ class Session(object):
         try:
             self.__session = requests.session(**kwargs)
         except:
-            raise EurobaseError('wrong definition for SESSION parameter')
+            raise ESDataError('wrong definition for SESSION parameter')
     def get(self, **kwargs):
         try:
             session = requests.session(**kwargs)
@@ -237,7 +237,7 @@ class Session(object):
         if 'protocol' in kwargs:    protocol = kwargs.pop('protocol')
         else:                       protocol = settings.DEF_PROTOCOL
         if protocol not in settings.PROTOCOLS:
-            raise EurobaseError('web protocol not recognised')
+            raise ESDataError('web protocol not recognised')
         if not url.startswith(protocol):  
             url = "{protocol}://{url}".format(protocol=protocol, url=url)
         if 'path' in kwargs:      
@@ -304,7 +304,7 @@ class Session(object):
              response = self.__session.head(url)
              response.raise_for_status()
         except:
-             raise EurobaseError('wrong request formulated')  
+             raise ESDataError('wrong request formulated')  
         else:
              status = response.status_code
              response.close()
@@ -315,7 +315,7 @@ class Session(object):
         #     response = urllib2.urlopen(request)
         # except urllib2.HTTPError as e:
         #     status, msg = cls.__decode_error(e)
-        #     raise EurobaseError('Error {} : {}'.format(status, msg))  
+        #     raise ESDataError('Error {} : {}'.format(status, msg))  
         # else:
         #     status = response.getcode()
         #     response.close()
@@ -337,7 +337,7 @@ class Session(object):
 
         Raises
         ------
-        EurobaseError
+        ESDataError
 
         Note
         ----
@@ -354,14 +354,14 @@ class Session(object):
              response = self.__session.get(url) # self.__session.request('get',url)
              response.raise_for_status()
         except:
-             raise EurobaseError('wrong request formulated')  
+             raise ESDataError('wrong request formulated')  
         ## urllib2 variant
         # request = urllib2.Request(url)
         # try:
         #     response = urllib2.urlopen(request)
         # except urllib2.HTTPError as e:
         #     status, msg = cls.__decode_error(e)
-        #     raise EurobaseError('Error {} : {}'.format(status, msg))  
+        #     raise ESDataError('Error {} : {}'.format(status, msg))  
         return response   
                         
     #/************************************************************************/
@@ -406,11 +406,11 @@ class Session(object):
                 if not os.path.exists(cache):
                     os.makedirs(cache)
                 elif not os.path.isdir(cache):
-                    raise EurobaseError('cache {} is not a directory'.format(cache))
+                    raise ESDataError('cache {} is not a directory'.format(cache))
                 self.__write_to_pathname(pathname, html)
         else:
             if not os.path.exists(cache) or not os.path.isdir(cache):
-                raise EurobaseError('cache {} is not a directory'.format(cache))
+                raise ESDataError('cache {} is not a directory'.format(cache))
             html = self.__read_from_pathname(pathname)
         return pathname, html
     @staticmethod
@@ -525,18 +525,18 @@ class Session(object):
         """
         parser = kwargs.get('kwargs','html.parser') 
         if parser not in ('html.parser','html5lib','lxml'):
-            raise EurobaseError('unknown soup parser')
+            raise ESDataError('unknown soup parser')
         ## urllib2 variant
         # html = response.read()
         try:
             raw = bs4.BeautifulSoup(html, parser)
             #raw = bs4.BeautifulSoup(html, parser).get_text()
         except:
-            raise EurobaseError('impossible to read HTML page') 
+            raise ESDataError('impossible to read HTML page') 
         try:
             tables = raw.findAll('table', **kwargs)
         except:
-            raise EurobaseError('error with soup from HTML page')
+            raise ESDataError('error with soup from HTML page')
         headers, rows = [], []
         for table in tables:
             try:

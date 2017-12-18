@@ -10,7 +10,7 @@ together with search and manipulation utilities.
 
 **About**
 
-*credits*:      `grazzja <jacopo.grazzini@ec.europa.eu>`_ 
+*credits*:      `gjacopo <jacopo.grazzini@ec.europa.eu>`_ 
 
 *version*:      0.1
 --
@@ -65,7 +65,7 @@ from functools import reduce
 #==============================================================================
 
 
-from . import EurobaseWarning, EurobaseError
+from . import ESDataWarning, ESDataError
 from . import settings
 from .session import Session
 from .collection import Collection
@@ -115,7 +115,7 @@ class API(object):
             try:
                 setattr(self, '{}'.format(attr), kwargs.pop(attr))
             except: 
-                warnings.warn(EurobaseWarning('wrong attribute value {}'.format(attr.upper())))
+                warnings.warn(ESDataWarning('wrong attribute value {}'.format(attr.upper())))
 
     #/************************************************************************/
     def __call__(self, **kwargs):
@@ -180,9 +180,9 @@ class API(object):
     @fmt.setter
     def fmt(self, fmt):
         if not isinstance(fmt, str):
-            raise EurobaseError('wrong type for FMT parameter')
+            raise ESDataError('wrong type for FMT parameter')
         elif not lang in settings.API_FMTS:
-            raise EurobaseError('format not supported')
+            raise ESDataError('format not supported')
         self.__fmt = fmt
            
     #/************************************************************************/
@@ -192,9 +192,9 @@ class API(object):
     @lang.setter
     def lang(self, lang):
         if not isinstance(lang, str):
-            raise EurobaseError('wrong type for LANG parameter')
+            raise ESDataError('wrong type for LANG parameter')
         elif not lang in settings.API_LANGS:
-            raise EurobaseError('language not supported')
+            raise ESDataError('language not supported')
         self.__lang = lang
       
     #/************************************************************************/
@@ -204,9 +204,9 @@ class API(object):
     @vers.setter
     def vers(self,version):
         if not(version is None or isinstance(version,float)): 
-            raise EurobaseError('wrong format/unrecognised version')
+            raise ESDataError('wrong format/unrecognised version')
         elif version < settings.API_VERSION:           
-            raise EurobaseError('version not supported') 
+            raise ESDataError('version not supported') 
         self.__vers = version
       
     #/************************************************************************/
@@ -216,16 +216,16 @@ class API(object):
     @domain.setter
     def domain(self,domain):
         if not(domain is None or isinstance(domain,str)):    
-            raise EurobaseError('wrong format/unrecognised domain') 
+            raise ESDataError('wrong format/unrecognised domain') 
         self.__domain = domain
       
     #/************************************************************************/
     @staticmethod
     def _check_dataset(dataset):
         if not(dataset is None or isinstance(dataset,str)):   
-            raise EurobaseError('wrong format/unrecognised dataset') 
+            raise ESDataError('wrong format/unrecognised dataset') 
         # CHECK DIMENSIONS!!!
-        # elif dataset < VERS_REST:            raise EurobaseError('version not supported')
+        # elif dataset < VERS_REST:            raise ESDataError('version not supported')
         else:                               
             return dataset
     def setDataset(self, dataset):
@@ -243,7 +243,7 @@ class API(object):
     @staticmethod
     def _check_precision(precision):
         if not(precision is None or isinstance(precision, int)):    
-            raise EurobaseError('wrong format/unrecognised precision')
+            raise ESDataError('wrong format/unrecognised precision')
         else:                                   
             return precision
     def setPrecision(self, precision):
@@ -286,8 +286,8 @@ class API(object):
     #/************************************************************************/
     @staticmethod
     def _get_status(status):
-        if status is None:                      raise EurobaseError('unknown status')
-        elif not isinstance(status, int):       raise EurobaseError('unrecognised status')
+        if status is None:                      raise ESDataError('unknown status')
+        elif not isinstance(status, int):       raise ESDataError('unrecognised status')
         else:                                   return status
     def setStatus(self, status):
         self._status=self._get_status(status)       
@@ -328,7 +328,7 @@ class API(object):
         if kwargs == {}:
             return None
         elif not('domain' in kwargs and 'vers' in kwargs and 'lang' in kwargs and 'fmt' in kwargs):
-            raise EurobaseError('uncomplete information for building URL')
+            raise ESDataError('uncomplete information for building URL')
         # set parameters
         vers=kwargs.pop('vers') 
         fmt=kwargs.pop('fmt') 
@@ -369,7 +369,7 @@ class API(object):
         try:            
             self.setUrl(**kwargs)
         except:
-            raise EurobaseError('Request URL not (re)set')
+            raise ESDataError('Request URL not (re)set')
     def get(self):
         """Get/retrieve the stored parameters: dataset, url (in this order).
         
@@ -432,7 +432,7 @@ class API(object):
         try:
             resp = response.read()
         except:
-            raise EurobaseError('error reading URL')    
+            raise ESDataError('error reading URL')    
         if fmt == 'json':
             resp = json.loads(resp)
         elif fmt == 'unicode':
@@ -452,7 +452,7 @@ class API(object):
                 try:        
                     return getattr(pyjstat, attr)
                 except:     
-                    raise EurobaseError('method/attribute {} not implemented'.format(attr))
+                    raise ESDataError('method/attribute {} not implemented'.format(attr))
        """
        pass
       
@@ -461,7 +461,7 @@ class API(object):
 # MAIN METHOD AND TESTING AREA
 #==============================================================================
 def main():
-    """eurobase.py main()"""
+    """esdata.py main()"""
     return
     
 if __name__ == '__main__':

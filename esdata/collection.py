@@ -8,7 +8,7 @@ dimensions and datasets, from `Eurostat online database <http://ec.europa.eu/eur
 
 **About**
 
-*credits*:      `grazzja <jacopo.grazzini@ec.europa.eu>`_ 
+*credits*:      `gjacopo <jacopo.grazzini@ec.europa.eu>`_ 
 
 *version*:      0.1
 --
@@ -55,7 +55,7 @@ try:
 except ImportError:                 
     pass
 
-from . import EurobaseWarning, EurobaseError
+from . import ESDataWarning, ESDataError
 from . import settings
 from .session import Session
 
@@ -122,7 +122,7 @@ class Collection(object):
                 try:
                     setattr(self, '{}'.format(attr), kwargs.pop(attr))
                 except: 
-                    warnings.warn(EurobaseWarning('wrong attribute value {}'.format(attr.upper())))
+                    warnings.warn(ESDataWarning('wrong attribute value {}'.format(attr.upper())))
         self.setSession(**kwargs)   # accepts keywords: time_out, force_download, cache
         self.setURL(**kwargs)       # accepts keywords: query, sort
        
@@ -136,7 +136,7 @@ class Collection(object):
     @domain.setter#analysis:ignore
     def domain(self, domain):
         if not isinstance(domain, str):
-            raise EurobaseError('wrong type for DOMAIN parameter')
+            raise ESDataError('wrong type for DOMAIN parameter')
         self.__domain = domain
 
     #/************************************************************************/
@@ -149,7 +149,7 @@ class Collection(object):
     @query.setter
     def query(self, query):
         if not isinstance(query, str):
-            raise EurobaseError('wrong type for QUERY parameter')
+            raise ESDataError('wrong type for QUERY parameter')
         self.__query = query
 
     #/************************************************************************/
@@ -163,9 +163,9 @@ class Collection(object):
     @lang.setter
     def lang(self, lang):
         if not isinstance(lang, str):
-            raise EurobaseError('wrong type for LANG parameter')
+            raise ESDataError('wrong type for LANG parameter')
         elif not lang in settings.LANGS:
-            raise EurobaseError('language not supported')
+            raise ESDataError('language not supported')
         self.__lang = lang
 
     #/************************************************************************/
@@ -178,9 +178,9 @@ class Collection(object):
     @sort.setter
     def sort(self, sort):
         if not isinstance(sort, int):
-            raise EurobaseError('wrong type for SORT parameter')
+            raise ESDataError('wrong type for SORT parameter')
         elif not sort > 0:
-            raise EurobaseError('wrong value for SORT parameter')
+            raise ESDataError('wrong value for SORT parameter')
         self.__sort = sort
 
     #/************************************************************************/
@@ -198,7 +198,7 @@ class Collection(object):
             else:
                 pass
         elif not isinstance(metabase, pd.DataFrame):
-            raise EurobaseError('wrong value for METABASE parameter')
+            raise ESDataError('wrong value for METABASE parameter')
         self.__metabase = metabase
 
     #/************************************************************************/
@@ -216,7 +216,7 @@ class Collection(object):
             else:
                 pass
         elif not isinstance(toc, pd.DataFrame):
-            raise EurobaseError('wrong value for TOC parameter')
+            raise ESDataError('wrong value for TOC parameter')
         self.__toc = toc
 
     #/************************************************************************/
@@ -235,7 +235,7 @@ class Collection(object):
         elif isinstance(dimension, str):
             dimension = {dimension: None}
         if not isinstance(dimension, dict) or not all([isinstance(d,str) for d in dimension]):
-            raise EurobaseError('wrong type for DIMENSION parameter')       
+            raise ESDataError('wrong type for DIMENSION parameter')       
         self.__dimension = dimension # not an update!
 
     #/************************************************************************/
@@ -255,7 +255,7 @@ class Collection(object):
         elif isinstance(dataset, str):
             dataset = {dataset: None}
         if not isinstance(dataset, dict) or not all([isinstance(d,str) for d in dataset]):
-            raise EurobaseError('wrong type for DATASETS parameter')       
+            raise ESDataError('wrong type for DATASETS parameter')       
         self.__dataset = dataset # not an update!
 
     #/************************************************************************/
@@ -267,7 +267,7 @@ class Collection(object):
         try:
             self.__session = Session(**kwargs)
         except:
-            raise EurobaseError('wrong definition for SESSION parameter')
+            raise ESDataError('wrong definition for SESSION parameter')
     def getSession(self, **kwargs):
         """Retrieve the session of the :class:`{Collection}` instance, or define
         a new one when arguments are passed.
@@ -324,7 +324,7 @@ class Collection(object):
         if 'lang' in kwargs:    lang = kwargs.pop('lang')
         else:                   lang = None
         if lang is not None and lang not in settings.LANGS:
-            raise EurobaseError('language not supported')
+            raise ESDataError('language not supported')
         # bug with the API? note that 'sort' needs to be the first item of the 
         # filters
         if 'sort' in kwargs:    sort = kwargs.pop('sort')
@@ -388,9 +388,9 @@ class Collection(object):
         """
         dimension, dataset = [kwargs.get(key) for key in ('dic','data')]
         if dataset is None and dimension is None:
-            raise EurobaseError('one of the parameters DIC or DATA needs to be set')
+            raise ESDataError('one of the parameters DIC or DATA needs to be set')
         elif not(dataset is None or dimension is None):
-            raise EurobaseError('parameters DIC or DATA are incompatible')
+            raise ESDataError('parameters DIC or DATA are incompatible')
         if dimension is not None:
             df = self.loadTable('dic')
             kname, kdate = [settings.BULK_DIC_NAMES.get(key) for key in ('Name','Date')]
@@ -401,11 +401,11 @@ class Collection(object):
             names = [d.split('.')[0] for d in list(df[0][kname])]
             dates = [d.split('.')[0] for d in list(df[0][kdate])]
         except:
-            raise EurobaseError('impossible to read {}/{} columns of bulk table'.format(kname,kdate)) 
+            raise ESDataError('impossible to read {}/{} columns of bulk table'.format(kname,kdate)) 
         try:
             ipar = names.index(dataset or dimension)
         except:
-            raise EurobaseError('entry {} not found in bulk table'.format(dataset or dimension)) 
+            raise ESDataError('entry {} not found in bulk table'.format(dataset or dimension)) 
         else:
             date = dates[ipar]
         return date
@@ -421,16 +421,16 @@ class Collection(object):
             url = '{}/{}'.format(url, self.lang)
         elif key == 'data':
             if alpha not in list(string.ascii_lowercase):
-                raise EurobaseError('wrong parameter ALPHA')
+                raise ESDataError('wrong parameter ALPHA')
             url = '{url}&start={alpha}'.format(url=url, alpha=alpha)        
         try:
             df = self.session.read_html_table(url, **kwargs)
         except:
-            raise EurobaseError('impossible to read html table: {}'.format(url)) 
+            raise ESDataError('impossible to read html table: {}'.format(url)) 
         return df
     def loadTable(self, key, alpha='a'):
         if not key in ('dic','data'):
-            raise EurobaseError('keyword parameter {} not recognised'.format(key))
+            raise ESDataError('keyword parameter {} not recognised'.format(key))
         elif key == 'dic':
             if not hasattr(self.__dimension, '_table_'):
                 self.__dimension['_table_'] = self.readTable(key)
@@ -456,9 +456,9 @@ class Collection(object):
         except: dataset = None
         else:   key, entity = 'DATA', 'dataset'
         if dataset is None and dimension is None:
-            raise EurobaseError('one of the parameters DIC or DATA needs to be set')
+            raise ESDataError('one of the parameters DIC or DATA needs to be set')
         elif not(dataset is None or dimension is None):
-            raise EurobaseError('parameters DIC or DATA are incompatible')
+            raise ESDataError('parameters DIC or DATA are incompatible')
         bulk_exts = settings.__builtins__['BULK_{}_EXTS'.format(key)]
         bulk_zip = settings.__builtins__['BULK_{}_ZIP'.format(key)]
         bulk_dir = settings.__builtins__['BULK_{}_DIR'.format(key)]
@@ -468,7 +468,7 @@ class Collection(object):
             ext = bulk_exts[0]
         else:
             if ext not in bulk_exts:   
-                raise EurobaseError('bulk {} extension EXT not recognised'.format(key)) 
+                raise ESDataError('bulk {} extension EXT not recognised'.format(key)) 
         if bulk_zip != '':
             ext = '{ext}.{zip}'.format(ext=ext, zip=bulk_zip)
         try:
@@ -477,7 +477,7 @@ class Collection(object):
             pass
         else:
             if resp is False:
-                raise EurobaseError('wrong {}'.format(key)) 
+                raise ESDataError('wrong {}'.format(key)) 
         url = self.update_url(self.url, sort=self.sort, file=bulk_dir)
         if dimension is not None:
             url = '{}/{}'.format(url, self.lang)
@@ -489,7 +489,7 @@ class Collection(object):
     @property
     def meta_dataset(self):
         if self.metabase is None:
-            raise EurobaseError('no METABASE data found') 
+            raise ESDataError('no METABASE data found') 
         dataset = settings.BULK_BASE_NAMES['data']
         return self.metabase[dataset].unique().tolist()
     @property
@@ -502,7 +502,7 @@ class Collection(object):
             try:
                 df = self.loadTable('data', alpha=alpha)
             except:
-                warnings.warn(EurobaseWarning('impossible to read html table: {}'.format(alpha)))
+                warnings.warn(ESDataWarning('impossible to read html table: {}'.format(alpha)))
             else:
                 # note the call to df[0] since there is one table only in the page
                 datasets += [d.split('.')[0] for d in list(df[0][kname])]
@@ -512,7 +512,7 @@ class Collection(object):
     @property
     def meta_dimension(self):
         if self.metabase is None:
-            raise EurobaseError('no METABASE data found') 
+            raise ESDataError('no METABASE data found') 
         dimension = settings.BULK_BASE_NAMES['dic']
         return self.metabase[dimension].unique().tolist()
     @property
@@ -523,7 +523,7 @@ class Collection(object):
             # note the call to df[0] since there is one table only in the page
             dimensions = [d.split('.')[0] for d in list(df[0][kname])]
         except:
-            raise EurobaseError('impossible to read {} column of bulk table'.format(kname)) 
+            raise ESDataError('impossible to read {} column of bulk table'.format(kname)) 
         return dimensions
 
     @property
@@ -534,7 +534,7 @@ class Collection(object):
             urlalpha = '{url}&start={alpha}'.format(url=url, alpha=alpha)
             _, html = self.session.load_page(urlalpha)
             if html is None or html == '':
-                raise EurobaseError('no HTML content found') 
+                raise ESDataError('no HTML content found') 
             _, rows = self.session.read_soup_table(html, attrs={'class':'filelist'})
             datasets += [d.split('.')[0] for d in self.__filter_table(rows)]
         return datasets
@@ -543,7 +543,7 @@ class Collection(object):
         url = self.update_url(self.url, lang=self.lang, sort=self.sort, dir=settings.BULK_DIC_DIR)
         _, html = self.session.load_page(url)
         if html is None or html == '':
-            raise EurobaseError('no HTML content found') 
+            raise ESDataError('no HTML content found') 
         _, rows = self.session.read_soup_table(html, attrs={'class':'filelist'})
         dimensions = [d.split('.')[0] for d in self.__filter_table(rows)]
         return dimensions
@@ -562,28 +562,28 @@ class Collection(object):
     #/************************************************************************/
     def __getitem__(self, item):
         if not isinstance(item, str):
-            raise EurobaseError('wrong type for ITEM parameter')
+            raise ESDataError('wrong type for ITEM parameter')
         if item in self.dimension:
             return self.__dimension[item]
         elif item in self.dataset:
             return self.__dataset[item]
     def __setitem__(self, item, value):
         if not isinstance(item, str):
-            raise EurobaseError('wrong type for ITEM parameter')
+            raise ESDataError('wrong type for ITEM parameter')
         if item in self.dimension:
             self.__dimension[item] = value
         elif item in self.dataset:
             self.__dataset[item] = value
     def __contains__(self, item):
         if not isinstance(item, str):
-            raise EurobaseError('wrong type for ITEM parameter')
+            raise ESDataError('wrong type for ITEM parameter')
         return item in self.dimension or item in self.dataset
 
     #/************************************************************************/
     @staticmethod
     def __check_member(member, members):
         if members is None or members==[]:
-            raise EurobaseError('no members to compare to')
+            raise ESDataError('no members to compare to')
         if member in members:      
             return True
         else:                       
@@ -597,13 +597,13 @@ class Collection(object):
     @staticmethod
     def __get_member(member, metabase, **kwargs):
         if metabase is None:
-            raise EurobaseError('metabase data not found - load the file from Eurobase')
+            raise ESDataError('metabase data not found - load the file from Eurobase')
         members = settings.BULK_BASE_NAMES # ('data', 'dic', 'label')
         if member not in members:
-            raise EurobaseError('member value not recognised - '
+            raise ESDataError('member value not recognised - '
                                 'must be any string in: {}'.format(members.keys()))
         elif set(kwargs.keys()).intersection([member]) != set(): # not empty
-            raise EurobaseError('member value should not be passed as a keyword argument')
+            raise ESDataError('member value should not be passed as a keyword argument')
         grpby = list(set(kwargs.keys()).intersection(set(members)))
         if grpby != []:
             fltby = tuple([kwargs.get(k) for k in grpby]) # preserve the order
@@ -718,14 +718,14 @@ class Collection(object):
             ext = settings.BULK_TOC_EXTS[0]
         else:
             if ext not in settings.BULK_TOC_EXTS:   
-                raise EurobaseError('bulk table of contents extension EXT not recognised') 
+                raise ESDataError('bulk table of contents extension EXT not recognised') 
         try:
             lang = kwargs.pop('lang')
         except:
             lang = self.lang
         else:
             if lang not in settings.LANGS:   
-                raise EurobaseError('language LANG not recognised') 
+                raise ESDataError('language LANG not recognised') 
         if ext == 'xml':
             tocfile = '{toc}.xml'.format(toc=settings.BULK_TOC_FILE)
         else:
@@ -751,10 +751,10 @@ class Collection(object):
     @staticmethod
     def __get_content(member, toc, **kwargs):
         if toc is None:
-            raise EurobaseError('table of contents not found - load the file from Eurobase')
+            raise ESDataError('table of contents not found - load the file from Eurobase')
         code = toc['code']
         if code[code.isin([member])].empty:
-            raise EurobaseError('member not found in codelist of table of contents')
+            raise ESDataError('member not found in codelist of table of contents')
         return toc[code==member]
         
     #/************************************************************************/
