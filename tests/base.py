@@ -17,7 +17,7 @@ Dependencies
 About
 -----
 
-*credits*:      `grazzja <jacopo.grazzini@jrc.ec.europa.eu>`_ 
+*credits*:      `gjacopo <jacopo.grazzini@jrc.ec.europa.eu>`_ 
 
 *since*:        Tue Jun  6 14:15:37 2017
 
