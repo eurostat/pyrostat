@@ -1,6 +1,11 @@
-*~
-*.pyc
-metabase.txt
-__pycache__
-__pycache__/*
+*/.DS_Store
 .DS_Store
+*~
+__temp
+__temp/*
+esdata/*~
+esdata/*/*~
+esdata/*.pyc
+esdata/*/*.pyc
+esdata/__pycache__
+esdata/*/__pycache__
