@@ -1,5 +1,5 @@
-esdata
-=====
+pyrostat
+========
 
 Interface to the REST API providing access to Eurostat online database.
 ---
