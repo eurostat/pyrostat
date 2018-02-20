@@ -38,6 +38,7 @@ dimensions and datasets, from `Eurostat online database <http://ec.europa.eu/eur
 # IMPORT STATEMENTS
 #==============================================================================
 
+import os
 import warnings
 import string
 from itertools import zip_longest
@@ -63,8 +64,177 @@ from .session import Session
 # CLASSES/METHODS
 #==============================================================================
     
+#%%
+class __Base(object):
+    """Generic collection class.
+    """
+    #/************************************************************************/
+    def __init__(self, **kwargs):
+        """Initialisation of a :class:`Collection` instance; pass all domain/query
+        items and  set all session.
 
-class Collection(object):
+            >>> coll = Collection(**kwargs)
+            
+        Keyword Arguments for url query
+        -------------------------------
+        `domain` : str
+            keys used to set various credentials, e.g. key, secret, token, and t
+        `query` : str
+        `lang` : str
+        `sort` : int
+        `dimension` :
+        `dataset` :
+        
+        Keyword Arguments used for :mod:`session` setting
+        -------------------------------------------------  
+        `cache`: str
+            directory where to store downloaded files
+        `time_out`: 
+            number of seconds considered to store file on disk, None is infinity, 
+            0 for not to store; default
+        `force_download` : bool
+        """
+        # set default values
+        self._session      = None
+        self._url          = None
+        self._status       = None
+        self._domain       = ''
+        self._query        = ''
+        self._lang         = settings.DEF_LANG
+        self._dimension    = {}
+        self._dataset      = {} # dict([(a, []) for a in list(string.ascii_lowercase)])
+        if kwargs != {}:
+            attrs = [a[1] if len(a)>1 else a for a in [attr.split('_') for attr in self.__dict__]] 
+            # ( 'domain','query','lang','dimension','dataset' )
+            for attr in list(set(attrs).intersection(kwargs.keys())):
+                try:
+                    setattr(self, '_{}'.format(attr), kwargs.pop(attr))
+                except: 
+                    warnings.warn(ESDataWarning('wrong attribute value {}'.format(attr.upper())))
+        self.setSession(**kwargs)   # accepts keywords: time_out, force_download, cache
+        self.setURL(**kwargs)       # accepts keywords: query, sort
+       
+    #/************************************************************************/
+    @property
+    def url(self):
+        #if self._url is None:   self.setURL()
+        return self._url
+
+    #/************************************************************************/
+    def setSession(self, **kwargs):
+        """Set the session of the :class:`{Collection}` instance.
+        
+            >>> session = C.setSession(**kwargs)
+        """
+        try:
+            self._session = Session(**kwargs)
+        except:
+            raise ESDataError('wrong definition for SESSION parameter')
+    def getSession(self, **kwargs):
+        """Retrieve the session of the :class:`{Collection}` instance, or define
+        a new one when arguments are passed.
+        
+            >>> session = C.getSession(**kwargs)
+
+        """
+        try:
+            session = Session(**kwargs)
+        except:
+            session = None
+            pass
+        return session or self._session
+    @property
+    def session(self):
+        return self._session #.session
+
+    #/************************************************************************/
+    @property
+    def domain(self):
+        """Domain attribute (:data:`getter`/:data:`setter`) used through a session 
+        launched to connect to bulk data webservice or REST service. 
+        """
+        return self._domain
+    @domain.setter#analysis:ignore
+    def domain(self, domain):
+        if not isinstance(domain, str):
+            raise ESDataError('wrong type for DOMAIN parameter')
+        self._domain = domain
+
+    #/************************************************************************/
+    @property
+    def query(self):
+        """Query attribute (:data:`getter`/:data:`setter`) attached to the domain
+        and used througout a launched session. 
+        """
+        return self._query
+    @query.setter
+    def query(self, query):
+        if not isinstance(query, str):
+            raise ESDataError('wrong type for QUERY parameter')
+        self._query = query
+
+    #/************************************************************************/
+    @property
+    def lang(self):
+        """Attribute (:data:`getter`/:data:`setter`) defining the language of the
+        objects (urls and files) returned when connecting througout a session. 
+        See :data:`settings.LANGS` for the list of currently accepted languages. 
+        """
+        return self._lang
+    @lang.setter
+    def lang(self, lang):
+        if not isinstance(lang, str):
+            raise ESDataError('wrong type for LANG parameter')
+        elif not lang in settings.LANGS:
+            raise ESDataError('language not supported')
+        self._lang = lang
+       
+    #/************************************************************************/
+    @staticmethod
+    def _fileexists(file):
+        return os.path.exists(os.path.abspath(file))
+       
+    #/************************************************************************/
+    def _url_static(self, **kwargs):
+        if kwargs == {}:
+            return domain
+        # set parameters
+        if 'lang' in kwargs:    lang = kwargs.pop('lang')
+        else:                   lang = None
+        if lang is not None and lang not in settings.LANGS:
+            raise ESDataError('language not supported')
+        # bug with the API? note that 'sort' needs to be the first item of the 
+        # filters
+        if 'sort' in kwargs:    sort = kwargs.pop('sort')
+        else:                   sort = settings.DEF_SORT
+        kwargs = OrderedDict(([('sort',sort)]+list(kwargs.items())))
+        # see also https://www.python.org/dev/peps/pep-0468/ 
+        url = Session.build_url(domain, **kwargs)
+        if lang is not None:
+            url = "{url}/{lang}".format(url=url,lang=lang)
+        return url
+        
+
+rest
+{host_url}/rest/data/{version}/{format}/{language}/{datasetCode}?{filters}
+http://ec.europa.eu/eurostat/wdds/ rest/data/v2.1/ json/en/nama_gdp_c?precision=1&geo=EU28&unit=EUR_HAB&time=2010&time=2011&indic_na=B1GM
+
+
+metabase:
+http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/ BulkDownloadListing? sort=1&file=metabase.txt.gz
+toc:
+http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/ BulkDownloadListing?sort=1&file=table_of_contents_en.txt
+dimension (dictionary):
+http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/ BulkDownloadListing?sort=1&file=dic%2Fen%2Fage.dic
+dataset:
+http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/ BulkDownloadListing?sort=1&file=data%2Filc_di01.tsv.gz
+http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/ BulkDownloadListing?sort=1&file=data%2Faact_ali01.tsv.gz
+metadata:
+http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/ BulkDownloadListing?sort=1&file=metadata%2Faact_esms.sdmx.zip
+
+    
+#%%
+class Bulk(__Base):
     """
     http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=dic/en/net_seg10.dic    
     http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=dic/en/dimlist.dic    
@@ -104,84 +274,27 @@ class Collection(object):
             0 for not to store; default
         `force_download` : bool
         """
-        self.__session      = None
-        self.__url          = None
-        self.__status       = None
-        self.__metabase     = None
         # set default values
-        self.__domain       = settings.BULK_DOMAIN
-        self.__lang         = settings.DEF_LANG
-        self.__sort         = settings.DEF_SORT
-        self.__query        = settings.BULK_QUERY
-        self.__dimension    = {}
-        self.__dataset      = {} # dict([(a, []) for a in list(string.ascii_lowercase)])
+        self._domain       = settings.BULK_DOMAIN
+        self._sort         = settings.DEF_SORT
+        self._query        = settings.BULK_QUERY
         # update
-        if kwargs != {}:
-            attrs = ( 'domain','query','lang','sort','dimension','dataset' )
-            for attr in list(set(attrs).intersection(kwargs.keys())):
-                try:
-                    setattr(self, '{}'.format(attr), kwargs.pop(attr))
-                except: 
-                    warnings.warn(ESDataWarning('wrong attribute value {}'.format(attr.upper())))
-        self.setSession(**kwargs)   # accepts keywords: time_out, force_download, cache
-        self.setURL(**kwargs)       # accepts keywords: query, sort
-       
-    #/************************************************************************/
-    @property
-    def domain(self):
-        """Eurostat domain attribute (:data:`getter`/:data:`setter`) used through
-        a session launched to connect to _Eurostat_ bulk data webservice. 
-        """
-        return self.__domain
-    @domain.setter#analysis:ignore
-    def domain(self, domain):
-        if not isinstance(domain, str):
-            raise ESDataError('wrong type for DOMAIN parameter')
-        self.__domain = domain
-
-    #/************************************************************************/
-    @property
-    def query(self):
-        """Query attribute (:data:`getter`/:data:`setter`) attached to the domain
-        and used througout a launched session. 
-        """
-        return self.__query
-    @query.setter
-    def query(self, query):
-        if not isinstance(query, str):
-            raise ESDataError('wrong type for QUERY parameter')
-        self.__query = query
-
-    #/************************************************************************/
-    @property
-    def lang(self):
-        """Attribute (:data:`getter`/:data:`setter`) defining the language of the
-        objects (urls and files) returned when connecting througout a session. 
-        See :data:`settings.LANGS` for the list of currently accepted languages. 
-        """
-        return self.__lang
-    @lang.setter
-    def lang(self, lang):
-        if not isinstance(lang, str):
-            raise ESDataError('wrong type for LANG parameter')
-        elif not lang in settings.LANGS:
-            raise ESDataError('language not supported')
-        self.__lang = lang
-
+        super(self, Bulk).__init__(**kwargs)
+        
     #/************************************************************************/
     @property
     def sort(self):
         """Sort attribute (:data:`getter`/:data:`setter`) used througout a session 
         launched to query _Eurostat_ bulk data collection. 
         """
-        return self.__sort
+        return self._sort
     @sort.setter
     def sort(self, sort):
         if not isinstance(sort, int):
             raise ESDataError('wrong type for SORT parameter')
         elif not sort > 0:
             raise ESDataError('wrong value for SORT parameter')
-        self.__sort = sort
+        self._sort = sort
 
     #/************************************************************************/
     @property
@@ -257,33 +370,6 @@ class Collection(object):
         if not isinstance(dataset, dict) or not all([isinstance(d,str) for d in dataset]):
             raise ESDataError('wrong type for DATASETS parameter')       
         self.__dataset = dataset # not an update!
-
-    #/************************************************************************/
-    def setSession(self, **kwargs):
-        """Set the session of the :class:`{Collection}` instance.
-        
-            >>> session = C.setSession(**kwargs)
-        """
-        try:
-            self.__session = Session(**kwargs)
-        except:
-            raise ESDataError('wrong definition for SESSION parameter')
-    def getSession(self, **kwargs):
-        """Retrieve the session of the :class:`{Collection}` instance, or define
-        a new one when arguments are passed.
-        
-            >>> session = C.getSession(**kwargs)
-
-        """
-        try:
-            session = Session(**kwargs)
-        except:
-            session = None
-            pass
-        return session or self.__session
-    @property
-    def session(self):
-        return self.__session #.session
  
     #/************************************************************************/
     @staticmethod
@@ -377,10 +463,6 @@ class Collection(object):
         if kwargs != {}:
             kwargs.update({'query': kwargs.get('query') or self.query})
         return Session.build_url(self.domain, **kwargs) or self.url
-    @property
-    def url(self):
-        #if self._url is None:   self.setURL()
-        return self.__url
             
     #/************************************************************************/
     def last_update(self, **kwargs):
@@ -676,7 +758,7 @@ class Collection(object):
     def geocode(self):
         return self.getDimension('geo')
         
-        #/************************************************************************/
+    #/************************************************************************/
     def setMetabase(self, **kwargs):
         self.__metabase = self.readMetabase(**kwargs)
     def readMetabase(self, **kwargs):

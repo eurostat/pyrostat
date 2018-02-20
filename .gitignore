@@ -3,9 +3,9 @@
 *~
 __temp
 __temp/*
-esdata/*~
-esdata/*/*~
-esdata/*.pyc
-esdata/*/*.pyc
-esdata/__pycache__
-esdata/*/__pycache__
+pyrostat/*~
+pyrostat/*/*~
+pyrostat/*.pyc
+pyrostat/*/*.pyc
+pyrostat/__pycache__
+pyrostat/*/__pycache__
