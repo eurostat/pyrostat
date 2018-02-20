@@ -56,9 +56,9 @@ try:
 except ImportError:                 
     pass
 
-from . import ESDataWarning, ESDataError
+from . import pyroWarning, pyroError
 from . import settings
-from .session import Session
+from . import session
 
 #==============================================================================
 # CLASSES/METHODS
@@ -82,8 +82,6 @@ class __Base(object):
         `query` : str
         `lang` : str
         `sort` : int
-        `dimension` :
-        `dataset` :
         
         Keyword Arguments used for :mod:`session` setting
         -------------------------------------------------  
@@ -95,26 +93,66 @@ class __Base(object):
         `force_download` : bool
         """
         # set default values
-        self._session      = None
-        self._url          = None
-        self._status       = None
         self._domain       = ''
         self._query        = ''
         self._lang         = settings.DEF_LANG
-        self._dimension    = {}
-        self._dataset      = {} # dict([(a, []) for a in list(string.ascii_lowercase)])
         if kwargs != {}:
             attrs = [a[1] if len(a)>1 else a for a in [attr.split('_') for attr in self.__dict__]] 
-            # ( 'domain','query','lang','dimension','dataset' )
+            # ( 'domain','query','lang')
             for attr in list(set(attrs).intersection(kwargs.keys())):
                 try:
                     setattr(self, '_{}'.format(attr), kwargs.pop(attr))
                 except: 
-                    warnings.warn(ESDataWarning('wrong attribute value {}'.format(attr.upper())))
+                    warnings.warn(pyroWarning('wrong attribute value {}'.format(attr.upper())))
+        self._session      = None
+        self._url          = None
+        self._status       = None
         self.setSession(**kwargs)   # accepts keywords: time_out, force_download, cache
         self.setURL(**kwargs)       # accepts keywords: query, sort
        
     #/************************************************************************/
+       
+    #/************************************************************************/
+    def setURL(self, **kwargs):
+        """Set the query URL to *Bulk download* web service.
+        
+            >>> url = C.setURL(**kwargs)
+           
+        Keyword Arguments
+        -----------------
+        kwargs : dict
+            define the parameters for web service.
+                
+        Returns
+        -------
+        url : str
+            link to Eurobase web service to submit the specified query.
+
+        Note
+        ----
+        The generic url formatting is:
+    
+        Example: 
+            http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?dir=comp
+            http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&dir=dic
+
+        # DIC_URL         = 'ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&dir=dic'
+        # DATA_URL        = 'ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&dir=data'
+    
+        """
+        if 'lang' in  kwargs:   kwargs.pop('lang')
+        #[kwargs.update({attr: kwargs.get(attr) or getattr(self, '{}'.format(attr))})
+        #    for attr in ('query','sort')]
+        kwargs.update({'query': kwargs.get('query') or self.query})
+        self.__url = Session.build_url(self.domain, **kwargs)
+    def getURL(self, **kwargs):
+        # update/merge passed arguments with already existing ones
+        if 'lang' in  kwargs:   kwargs.pop('lang')
+        #[kwargs.update({attr: kwargs.get(attr) or getattr(self, '{}'.format(attr))})
+        #    for attr in set(('query','sort')).intersection(set(kwargs.keys()))]
+        if kwargs != {}:
+            kwargs.update({'query': kwargs.get('query') or self.query})
+        return Session.build_url(self.domain, **kwargs) or self.url
     @property
     def url(self):
         #if self._url is None:   self.setURL()
@@ -127,9 +165,9 @@ class __Base(object):
             >>> session = C.setSession(**kwargs)
         """
         try:
-            self._session = Session(**kwargs)
+            self._session = sessionSession(**kwargs)
         except:
-            raise ESDataError('wrong definition for SESSION parameter')
+            raise pyroError('wrong definition for SESSION parameter')
     def getSession(self, **kwargs):
         """Retrieve the session of the :class:`{Collection}` instance, or define
         a new one when arguments are passed.
@@ -157,7 +195,7 @@ class __Base(object):
     @domain.setter#analysis:ignore
     def domain(self, domain):
         if not isinstance(domain, str):
-            raise ESDataError('wrong type for DOMAIN parameter')
+            raise pyroError('wrong type for DOMAIN parameter')
         self._domain = domain
 
     #/************************************************************************/
@@ -170,7 +208,7 @@ class __Base(object):
     @query.setter
     def query(self, query):
         if not isinstance(query, str):
-            raise ESDataError('wrong type for QUERY parameter')
+            raise pyroError('wrong type for QUERY parameter')
         self._query = query
 
     #/************************************************************************/
@@ -184,9 +222,9 @@ class __Base(object):
     @lang.setter
     def lang(self, lang):
         if not isinstance(lang, str):
-            raise ESDataError('wrong type for LANG parameter')
+            raise pyroError('wrong type for LANG parameter')
         elif not lang in settings.LANGS:
-            raise ESDataError('language not supported')
+            raise pyroError('language not supported')
         self._lang = lang
        
     #/************************************************************************/
@@ -202,7 +240,7 @@ class __Base(object):
         if 'lang' in kwargs:    lang = kwargs.pop('lang')
         else:                   lang = None
         if lang is not None and lang not in settings.LANGS:
-            raise ESDataError('language not supported')
+            raise pyroError('language not supported')
         # bug with the API? note that 'sort' needs to be the first item of the 
         # filters
         if 'sort' in kwargs:    sort = kwargs.pop('sort')
@@ -278,6 +316,8 @@ class Bulk(__Base):
         self._domain       = settings.BULK_DOMAIN
         self._sort         = settings.DEF_SORT
         self._query        = settings.BULK_QUERY
+        self._dimension    = {}
+        self._dataset      = {} # dict([(a, []) for a in list(string.ascii_lowercase)])
         # update
         super(self, Bulk).__init__(**kwargs)
         
@@ -291,9 +331,9 @@ class Bulk(__Base):
     @sort.setter
     def sort(self, sort):
         if not isinstance(sort, int):
-            raise ESDataError('wrong type for SORT parameter')
+            raise pyroError('wrong type for SORT parameter')
         elif not sort > 0:
-            raise ESDataError('wrong value for SORT parameter')
+            raise pyroError('wrong value for SORT parameter')
         self._sort = sort
 
     #/************************************************************************/
@@ -311,7 +351,7 @@ class Bulk(__Base):
             else:
                 pass
         elif not isinstance(metabase, pd.DataFrame):
-            raise ESDataError('wrong value for METABASE parameter')
+            raise pyroError('wrong value for METABASE parameter')
         self.__metabase = metabase
 
     #/************************************************************************/
@@ -329,7 +369,7 @@ class Bulk(__Base):
             else:
                 pass
         elif not isinstance(toc, pd.DataFrame):
-            raise ESDataError('wrong value for TOC parameter')
+            raise pyroError('wrong value for TOC parameter')
         self.__toc = toc
 
     #/************************************************************************/
@@ -348,7 +388,7 @@ class Bulk(__Base):
         elif isinstance(dimension, str):
             dimension = {dimension: None}
         if not isinstance(dimension, dict) or not all([isinstance(d,str) for d in dimension]):
-            raise ESDataError('wrong type for DIMENSION parameter')       
+            raise pyroError('wrong type for DIMENSION parameter')       
         self.__dimension = dimension # not an update!
 
     #/************************************************************************/
@@ -368,7 +408,7 @@ class Bulk(__Base):
         elif isinstance(dataset, str):
             dataset = {dataset: None}
         if not isinstance(dataset, dict) or not all([isinstance(d,str) for d in dataset]):
-            raise ESDataError('wrong type for DATASETS parameter')       
+            raise pyroError('wrong type for DATASETS parameter')       
         self.__dataset = dataset # not an update!
  
     #/************************************************************************/
@@ -410,7 +450,7 @@ class Bulk(__Base):
         if 'lang' in kwargs:    lang = kwargs.pop('lang')
         else:                   lang = None
         if lang is not None and lang not in settings.LANGS:
-            raise ESDataError('language not supported')
+            raise pyroError('language not supported')
         # bug with the API? note that 'sort' needs to be the first item of the 
         # filters
         if 'sort' in kwargs:    sort = kwargs.pop('sort')
@@ -421,48 +461,6 @@ class Bulk(__Base):
         if lang is not None:
             url = "{url}/{lang}".format(url=url,lang=lang)
         return url
-       
-    #/************************************************************************/
-    def setURL(self, **kwargs):
-        """Set the query URL to *Bulk download* web service.
-        
-            >>> url = C.setURL(**kwargs)
-           
-        Keyword Arguments
-        -----------------
-        kwargs : dict
-            define the parameters for web service.
-                
-        Returns
-        -------
-        url : str
-            link to Eurobase web service to submit the specified query.
-
-        Note
-        ----
-        The generic url formatting is:
-    
-        Example: 
-            http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?dir=comp
-            http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&dir=dic
-
-        # DIC_URL         = 'ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&dir=dic'
-        # DATA_URL        = 'ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&dir=data'
-    
-        """
-        if 'lang' in  kwargs:   kwargs.pop('lang')
-        #[kwargs.update({attr: kwargs.get(attr) or getattr(self, '{}'.format(attr))})
-        #    for attr in ('query','sort')]
-        kwargs.update({'query': kwargs.get('query') or self.query})
-        self.__url = Session.build_url(self.domain, **kwargs)
-    def getURL(self, **kwargs):
-        # update/merge passed arguments with already existing ones
-        if 'lang' in  kwargs:   kwargs.pop('lang')
-        #[kwargs.update({attr: kwargs.get(attr) or getattr(self, '{}'.format(attr))})
-        #    for attr in set(('query','sort')).intersection(set(kwargs.keys()))]
-        if kwargs != {}:
-            kwargs.update({'query': kwargs.get('query') or self.query})
-        return Session.build_url(self.domain, **kwargs) or self.url
             
     #/************************************************************************/
     def last_update(self, **kwargs):
@@ -470,9 +468,9 @@ class Bulk(__Base):
         """
         dimension, dataset = [kwargs.get(key) for key in ('dic','data')]
         if dataset is None and dimension is None:
-            raise ESDataError('one of the parameters DIC or DATA needs to be set')
+            raise pyroError('one of the parameters DIC or DATA needs to be set')
         elif not(dataset is None or dimension is None):
-            raise ESDataError('parameters DIC or DATA are incompatible')
+            raise pyroError('parameters DIC or DATA are incompatible')
         if dimension is not None:
             df = self.loadTable('dic')
             kname, kdate = [settings.BULK_DIC_NAMES.get(key) for key in ('Name','Date')]
@@ -483,11 +481,11 @@ class Bulk(__Base):
             names = [d.split('.')[0] for d in list(df[0][kname])]
             dates = [d.split('.')[0] for d in list(df[0][kdate])]
         except:
-            raise ESDataError('impossible to read {}/{} columns of bulk table'.format(kname,kdate)) 
+            raise pyroError('impossible to read {}/{} columns of bulk table'.format(kname,kdate)) 
         try:
             ipar = names.index(dataset or dimension)
         except:
-            raise ESDataError('entry {} not found in bulk table'.format(dataset or dimension)) 
+            raise pyroError('entry {} not found in bulk table'.format(dataset or dimension)) 
         else:
             date = dates[ipar]
         return date
@@ -503,16 +501,16 @@ class Bulk(__Base):
             url = '{}/{}'.format(url, self.lang)
         elif key == 'data':
             if alpha not in list(string.ascii_lowercase):
-                raise ESDataError('wrong parameter ALPHA')
+                raise pyroError('wrong parameter ALPHA')
             url = '{url}&start={alpha}'.format(url=url, alpha=alpha)        
         try:
             df = self.session.read_html_table(url, **kwargs)
         except:
-            raise ESDataError('impossible to read html table: {}'.format(url)) 
+            raise pyroError('impossible to read html table: {}'.format(url)) 
         return df
     def loadTable(self, key, alpha='a'):
         if not key in ('dic','data'):
-            raise ESDataError('keyword parameter {} not recognised'.format(key))
+            raise pyroError('keyword parameter {} not recognised'.format(key))
         elif key == 'dic':
             if not hasattr(self.__dimension, '_table_'):
                 self.__dimension['_table_'] = self.readTable(key)
@@ -522,7 +520,7 @@ class Bulk(__Base):
                 and  not hasattr(self.__dataset['_table_'], alpha):
                     self.__dataset['_table_'][alpha] = self.readTable(key, alpha)
             return self.__dataset['_table_'][alpha]
-    def readBulk(self, **kwargs):
+    def read(self, **kwargs):
         """
         dimension example:
         example http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing?sort=1&file=dic%2Fen%2Faccident.dic
@@ -538,9 +536,9 @@ class Bulk(__Base):
         except: dataset = None
         else:   key, entity = 'DATA', 'dataset'
         if dataset is None and dimension is None:
-            raise ESDataError('one of the parameters DIC or DATA needs to be set')
+            raise pyroError('one of the parameters DIC or DATA needs to be set')
         elif not(dataset is None or dimension is None):
-            raise ESDataError('parameters DIC or DATA are incompatible')
+            raise pyroError('parameters DIC or DATA are incompatible')
         bulk_exts = settings.__builtins__['BULK_{}_EXTS'.format(key)]
         bulk_zip = settings.__builtins__['BULK_{}_ZIP'.format(key)]
         bulk_dir = settings.__builtins__['BULK_{}_DIR'.format(key)]
@@ -550,7 +548,7 @@ class Bulk(__Base):
             ext = bulk_exts[0]
         else:
             if ext not in bulk_exts:   
-                raise ESDataError('bulk {} extension EXT not recognised'.format(key)) 
+                raise pyroError('bulk {} extension EXT not recognised'.format(key)) 
         if bulk_zip != '':
             ext = '{ext}.{zip}'.format(ext=ext, zip=bulk_zip)
         try:
@@ -559,7 +557,7 @@ class Bulk(__Base):
             pass
         else:
             if resp is False:
-                raise ESDataError('wrong {}'.format(key)) 
+                raise pyroError('wrong {}'.format(key)) 
         url = self.update_url(self.url, sort=self.sort, file=bulk_dir)
         if dimension is not None:
             url = '{}/{}'.format(url, self.lang)
@@ -569,13 +567,7 @@ class Bulk(__Base):
 
     #/************************************************************************/
     @property
-    def meta_dataset(self):
-        if self.metabase is None:
-            raise ESDataError('no METABASE data found') 
-        dataset = settings.BULK_BASE_NAMES['data']
-        return self.metabase[dataset].unique().tolist()
-    @property
-    def bulk_dataset(self):
+    def dataset(self):
         datasets = []
         # url = self.update_url(self.url, sort=self.sort, dir=settings.BULK_DATA_DIR)
         # kwargs = {'skiprows': [1], 'header': 0}
@@ -584,7 +576,7 @@ class Bulk(__Base):
             try:
                 df = self.loadTable('data', alpha=alpha)
             except:
-                warnings.warn(ESDataWarning('impossible to read html table: {}'.format(alpha)))
+                warnings.warn(pyroWarning('impossible to read html table: {}'.format(alpha)))
             else:
                 # note the call to df[0] since there is one table only in the page
                 datasets += [d.split('.')[0] for d in list(df[0][kname])]
@@ -592,20 +584,14 @@ class Bulk(__Base):
 
     #/************************************************************************/
     @property
-    def meta_dimension(self):
-        if self.metabase is None:
-            raise ESDataError('no METABASE data found') 
-        dimension = settings.BULK_BASE_NAMES['dic']
-        return self.metabase[dimension].unique().tolist()
-    @property
-    def bulk_dimension(self):
+    def dimension(self):
         df = self.loadTable('dic')
         kname = settings.BULK_DIC_NAMES['Name']
         try:
             # note the call to df[0] since there is one table only in the page
             dimensions = [d.split('.')[0] for d in list(df[0][kname])]
         except:
-            raise ESDataError('impossible to read {} column of bulk table'.format(kname)) 
+            raise pyroError('impossible to read {} column of bulk table'.format(kname)) 
         return dimensions
 
     @property
@@ -616,7 +602,7 @@ class Bulk(__Base):
             urlalpha = '{url}&start={alpha}'.format(url=url, alpha=alpha)
             _, html = self.session.load_page(urlalpha)
             if html is None or html == '':
-                raise ESDataError('no HTML content found') 
+                raise pyroError('no HTML content found') 
             _, rows = self.session.read_soup_table(html, attrs={'class':'filelist'})
             datasets += [d.split('.')[0] for d in self.__filter_table(rows)]
         return datasets
@@ -625,7 +611,7 @@ class Bulk(__Base):
         url = self.update_url(self.url, lang=self.lang, sort=self.sort, dir=settings.BULK_DIC_DIR)
         _, html = self.session.load_page(url)
         if html is None or html == '':
-            raise ESDataError('no HTML content found') 
+            raise pyroError('no HTML content found') 
         _, rows = self.session.read_soup_table(html, attrs={'class':'filelist'})
         dimensions = [d.split('.')[0] for d in self.__filter_table(rows)]
         return dimensions
@@ -641,31 +627,49 @@ class Bulk(__Base):
             else:                       data.append(cols[0].find('a').find(text=True))
         return data    
         
+class Meta(__Base):
+        
+    #/************************************************************************/
+    @property
+    def dataset(self):
+        if self.metabase is None:
+            raise pyroError('no METABASE data found') 
+        dataset = settings.BULK_BASE_NAMES['data']
+        return self.metabase[dataset].unique().tolist()
+
+    #/************************************************************************/
+    @property
+    def dimension(self):
+        if self.metabase is None:
+            raise pyroError('no METABASE data found') 
+        dimension = settings.BULK_BASE_NAMES['dic']
+        return self.metabase[dimension].unique().tolist()
+    
     #/************************************************************************/
     def __getitem__(self, item):
         if not isinstance(item, str):
-            raise ESDataError('wrong type for ITEM parameter')
+            raise pyroError('wrong type for ITEM parameter')
         if item in self.dimension:
             return self.__dimension[item]
         elif item in self.dataset:
             return self.__dataset[item]
     def __setitem__(self, item, value):
         if not isinstance(item, str):
-            raise ESDataError('wrong type for ITEM parameter')
+            raise pyroError('wrong type for ITEM parameter')
         if item in self.dimension:
             self.__dimension[item] = value
         elif item in self.dataset:
             self.__dataset[item] = value
     def __contains__(self, item):
         if not isinstance(item, str):
-            raise ESDataError('wrong type for ITEM parameter')
+            raise pyroError('wrong type for ITEM parameter')
         return item in self.dimension or item in self.dataset
 
     #/************************************************************************/
     @staticmethod
     def __check_member(member, members):
         if members is None or members==[]:
-            raise ESDataError('no members to compare to')
+            raise pyroError('no members to compare to')
         if member in members:      
             return True
         else:                       
@@ -679,13 +683,13 @@ class Bulk(__Base):
     @staticmethod
     def __get_member(member, metabase, **kwargs):
         if metabase is None:
-            raise ESDataError('metabase data not found - load the file from Eurobase')
+            raise pyroError('metabase data not found - load the file from Eurobase')
         members = settings.BULK_BASE_NAMES # ('data', 'dic', 'label')
         if member not in members:
-            raise ESDataError('member value not recognised - '
+            raise pyroError('member value not recognised - '
                                 'must be any string in: {}'.format(members.keys()))
         elif set(kwargs.keys()).intersection([member]) != set(): # not empty
-            raise ESDataError('member value should not be passed as a keyword argument')
+            raise pyroError('member value should not be passed as a keyword argument')
         grpby = list(set(kwargs.keys()).intersection(set(members)))
         if grpby != []:
             fltby = tuple([kwargs.get(k) for k in grpby]) # preserve the order
@@ -800,14 +804,14 @@ class Bulk(__Base):
             ext = settings.BULK_TOC_EXTS[0]
         else:
             if ext not in settings.BULK_TOC_EXTS:   
-                raise ESDataError('bulk table of contents extension EXT not recognised') 
+                raise pyroError('bulk table of contents extension EXT not recognised') 
         try:
             lang = kwargs.pop('lang')
         except:
             lang = self.lang
         else:
             if lang not in settings.LANGS:   
-                raise ESDataError('language LANG not recognised') 
+                raise pyroError('language LANG not recognised') 
         if ext == 'xml':
             tocfile = '{toc}.xml'.format(toc=settings.BULK_TOC_FILE)
         else:
@@ -833,10 +837,10 @@ class Bulk(__Base):
     @staticmethod
     def __get_content(member, toc, **kwargs):
         if toc is None:
-            raise ESDataError('table of contents not found - load the file from Eurobase')
+            raise pyroError('table of contents not found - load the file from Eurobase')
         code = toc['code']
         if code[code.isin([member])].empty:
-            raise ESDataError('member not found in codelist of table of contents')
+            raise pyroError('member not found in codelist of table of contents')
         return toc[code==member]
         
     #/************************************************************************/
@@ -852,4 +856,7 @@ class Bulk(__Base):
         start = res['data start'][ind[0]]
         end = res['data end'][ind[0]]
         return [start, end]
-        
+    
+
+class Rest(__Base):
+    pass

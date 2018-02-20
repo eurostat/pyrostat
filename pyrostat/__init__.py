@@ -4,7 +4,7 @@
 """
 .. __init__.py
 
-Tools for Eurostat data collections upload
+Tools for Eurostat data collections upload.
 
 **About**
 
@@ -19,7 +19,7 @@ Tools for Eurostat data collections upload
 
 **Usage**
 
-    >>> import esdata
+    >>> import pyrostat
     
 """
 
@@ -46,13 +46,13 @@ metadata = dict([
 # GLOBAL CLASSES/METHODS/VARIABLES
 #==============================================================================
 
-class ESDataError(Exception):
+class pyroError(Exception):
     """Base class for exceptions in this module."""
     def __init__(self, msg, expr=None):    
         self.msg = msg
         if expr is not None:    self.expr = expr
     def __str__(self):              return repr(self.msg)
-class ESDataWarning(Warning):
+class pyroWarning(Warning):
     """Base class for warnings in this module."""
     def __init__(self, msg, expr=None):    
         self.msg = msg
