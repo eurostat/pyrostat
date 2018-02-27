@@ -24,138 +24,141 @@ from collections import OrderedDict
 # GLOBAL CLASSES/METHODS/VARIABLES
 #==============================================================================
 
-PACKAGE         = "esdata"
+PACKAGE             = "pyrostat"
 
-API_DOMAIN      = 'ec.europa.eu/eurostat/wdds/rest/data'
+PROTOCOLS           = ('http', 'https', 'ftp')
+"""
+Recognised protocols (API, bulk downloads,...).
+"""
+DEF_PROTOCOL        = 'http'
+PROTOCOL            = DEF_PROTOCOL
+"""
+Default protocol used by the API.
+"""
+LANGS               = ('en','de','fr')
+"""
+Languages supported by this package.
+"""
+DEF_LANG            = 'en'
+"""
+Default language used when launching Eurostat API.
+"""
+
+EC_URL              = 'ec.europa.eu'
+"""
+European Commission URL.
+"""
+ESTAT_DOMAIN        = 'eurostat' 
+"""
+Eurostat domain under European Commission URL.
+"""
+# ESTAT_URL           = '%s://%s/%s' % (PROTOCOL, EC_URL, ESTAT_DOMAIN)
+ESTAT_URL           = '%s/%s' % (EC_URL, ESTAT_DOMAIN)
+"""
+Eurostat complete URL.
+"""
+
+API_SUBDOMAIN       = 'wdds/rest/data'
+"""
+Subdomain of Eurostat API.
+"""
+API_DOMAIN          = '%s/%s' % (ESTAT_URL, API_SUBDOMAIN)
 """
 Domain of Eurostat API.
 """
-API_VERS        = 2.1
+API_VERS            = 2.1
 """
 Version of Eurostat API.
 """
-API_PRECISION   = 1 # only available at the moment? 
+API_PRECISION       = 1 # only available at the moment? 
 """
 Precision of data fetched through Eurostat API. 
 """
-API_FMTS        = ('json', 'unicode')
+API_FMTS            = ('json', 'unicode')
 """
 Formats supported by Eurostat API. 
 """
-API_LANGS       = ('en','de','fr')
+API_LANGS           = ('en','de','fr')
 """
 Languages supported by Eurostat API.
 """
 
-PROTOCOLS       = ('http', 'https', 'ftp')
-"""
-Recognised protocols (API, bulk downloads,...).
-"""
-DEF_PROTOCOL    = 'http'
-"""
-Default protocol used by the API.
-"""
-LANGS           = ('en','de','fr')
-"""
-Languages supported by this package.
-"""
-DEF_LANG        = 'en'
-"""
-Default language used when launching Eurostat API.
-"""
-DEF_SORT        = 1
+DEF_SORT            = 1
 """
 Default sort value.
 """
-DEF_FMT        = 'json'
+DEF_FMT             = 'json'
 """
 Default format of data returned by Eurostat API request.
 """
 
-BULK_DOMAIN     = 'ec.europa.eu/eurostat/estat-navtree-portlet-prod/'
+BULK_SUBDOMAIN      = 'estat-navtree-portlet-prod'
 """
-Online repository of bulk Eurostat datasets.
+Subdomain of the repository for bulk Eurostat datasets.
 """
-BULK_QUERY      = 'BulkDownloadListing'
+BULK_DOMAIN         = '%s/%s' % (ESTAT_URL, BULK_SUBDOMAIN)
+"""
+Online repository for bulk Eurostat datasets.
+"""
+BULK_QUERY          = 'BulkDownloadListing'
 """
 Address linking to bulk datasets.
 """
-BULK_DIC_DIR    = 'dic'
+BULK_DIR            = {'dic':   'dic', 
+                       'data':  'data', 
+                       'base':  '',
+                       'toc':   ''}
 """
-Directory (address) of bulk dictionaries.
+Directory (address) of bulk dictionaries/datasets/metadata files.
 """
-BULK_DIC_LIST   = 'dimlist'
+BULK_LIST           = {'dic':   'dimlist', 
+                       'data':  '', 
+                       'base':  '',
+                       'toc':   ''}
 """
 Code for dim/list data.
 """
-BULK_DIC_EXTS   = ['dic'] # should be a list
+BULK_EXTS           = {'dic':   ['dic',], 
+                       'data':  ['tsv', 'sdmx'], 
+                       'base':  ['txt',],
+                       'toc':   ['txt', 'xml']}
 """
-Extension ("format") of bulk dictionaries.
+Extension ("format") of bulk dictionaries/datasets/metadata files.
 """
-BULK_DIC_NAMES  = ['Name', 'Size', 'Type', 'Date']
+BULK_NAMES          =  {'dic':  {'name': 'Name', 'size':'Size', 'type':'Type', 'date':'Date'},
+                        'data': {'name': 'Name', 'size':'Size', 'type':'Type', 'date':'Date'},
+                        'base': {'data':'data', 'dic':'dic', 'label':'label'},
+                        'toc':  {'title':'title', 'code':'code', 'type':'type', \
+                                 'last_update':'last update of data',           \
+                                 'last_change': 'last table structure change',  \
+                                 'start':'data start', 'end':'data end'}}
 """
-Labels used in the tables informing the bulk dictionaries.
+Labels used in the tables informing the bulk dictionaries/datasets/metadata files.
 """
-BULK_DIC_ZIP    = 'gz' 
+BULK_ZIP            = {'dic':   'gz', 
+                       'data':  'gz', 
+                       'base':  'gz',
+                       'toc':   ''}
 """
-Extension ("format") of bulk dictionaries.
+Extension ("format") of compressed bulk dictionaries/datasets/metadata files.
 """
-BULK_DATA_DIR   = 'data'
+BULK_FILES          = {'dic':   '', 
+                       'data':  '', 
+                       'base':  'metabase',
+                       'toc':   'table_of_contents'}
 """
-Directory (address) of bulk datasets.
+Generic string used for naming the bulk dictionaries/datasets/metadata files, for
+instance the file storing all metadata about Eurostat datasets, or the the table 
+of contents providing contents of Eurostat database.
 """
-BULK_DATA_EXTS  = ['tsv', 'sdmx'] # should be a list
-"""
-Extensions ("formats") of bulk datasets.
-"""
-BULK_DATA_NAMES  = ['Name', 'Size', 'Type', 'Date']
-"""
-Labels used in the tables informing the bulk datasets.
-"""
-BULK_DATA_ZIP   = 'gz'
-"""
-Extension ("format") of compressed bulk datasets. 
-"""
-BULK_BASE_FILE  = 'metabase'
-"""
-Name of the base file storing all metadata about Eurostat datasets.
-"""
-BULK_BASE_EXT   = 'txt'
-"""
-Extension ("format") of the base file.
-"""
-BULK_BASE_ZIP   = 'gz' 
-"""
-Extension ("format") of compressed base file (if compressed). 
-"""
-BULK_BASE_NAMES = ['data', 'dic', 'label'] # should be a list
-"""
-Labels used in the tables informing the base file.
-""" # note: DO NOT MODIFY ... or also modify Collection.__get_member accordingly
-BULK_TOC_FILE   = 'table_of_contents'
-"""
-Name of the table of contents providing contents of Eurostat database.
-"""
-BULK_TOC_EXTS   = ['txt', 'xml'] # should be a list
-"""
-Extensions ("formats") of table of contents.
-"""
-BULK_TOC_ZIP    = ''
-"""
-Extension ("format") of compressed table of contents. 
-"""
-BULK_TOC_NAMES  = ['title', 'code', 'type',                                 \
-                   'last update of data', 'last table structure change',    \
-                   'data start', 'data end']
-"""
-Labels used in the table of contents.
-"""
-KW_DEFAULT      = 'default'
+
+KW_DEFAULT          = 'default'
 """
 """
 
-BS_PARSERS      = ("html.parser","html5lib","lxml","xml")
+BS_PARSERS          = ("html.parser", "html5lib", "lxml", "xml")
 """
 """
 
 EXCEPTIONS          = {}
+
