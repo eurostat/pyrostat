@@ -65,10 +65,10 @@ from functools import reduce
 #==============================================================================
 
 
-from . import ESDataWarning, ESDataError
+from . import pyroWarning, pyroError
 from . import settings
-from .session import Session
-from .collection import Collection
+from session import Session
+from collection import Collection
 
 #==============================================================================
 # CLASSES/METHODS
@@ -115,7 +115,7 @@ class API(object):
             try:
                 setattr(self, '{}'.format(attr), kwargs.pop(attr))
             except: 
-                warnings.warn(ESDataWarning('wrong attribute value {}'.format(attr.upper())))
+                warnings.warn(pyroWarning('wrong attribute value {}'.format(attr.upper())))
 
     #/************************************************************************/
     def __call__(self, **kwargs):
@@ -180,9 +180,9 @@ class API(object):
     @fmt.setter
     def fmt(self, fmt):
         if not isinstance(fmt, str):
-            raise ESDataError('wrong type for FMT parameter')
-        elif not lang in settings.API_FMTS:
-            raise ESDataError('format not supported')
+            raise pyroError('wrong type for FMT parameter')
+        elif not fmt in settings.API_FMTS:
+            raise pyroError('format not supported')
         self.__fmt = fmt
            
     #/************************************************************************/
@@ -192,9 +192,9 @@ class API(object):
     @lang.setter
     def lang(self, lang):
         if not isinstance(lang, str):
-            raise ESDataError('wrong type for LANG parameter')
+            raise pyroError('wrong type for LANG parameter')
         elif not lang in settings.API_LANGS:
-            raise ESDataError('language not supported')
+            raise pyroError('language not supported')
         self.__lang = lang
       
     #/************************************************************************/
@@ -204,9 +204,9 @@ class API(object):
     @vers.setter
     def vers(self,version):
         if not(version is None or isinstance(version,float)): 
-            raise ESDataError('wrong format/unrecognised version')
+            raise pyroError('wrong format/unrecognised version')
         elif version < settings.API_VERSION:           
-            raise ESDataError('version not supported') 
+            raise pyroError('version not supported') 
         self.__vers = version
       
     #/************************************************************************/
@@ -216,16 +216,16 @@ class API(object):
     @domain.setter
     def domain(self,domain):
         if not(domain is None or isinstance(domain,str)):    
-            raise ESDataError('wrong format/unrecognised domain') 
+            raise pyroError('wrong format/unrecognised domain') 
         self.__domain = domain
       
     #/************************************************************************/
     @staticmethod
     def _check_dataset(dataset):
         if not(dataset is None or isinstance(dataset,str)):   
-            raise ESDataError('wrong format/unrecognised dataset') 
+            raise pyroError('wrong format/unrecognised dataset') 
         # CHECK DIMENSIONS!!!
-        # elif dataset < VERS_REST:            raise ESDataError('version not supported')
+        # elif dataset < VERS_REST:            raise pyroError('version not supported')
         else:                               
             return dataset
     def setDataset(self, dataset):
@@ -243,7 +243,7 @@ class API(object):
     @staticmethod
     def _check_precision(precision):
         if not(precision is None or isinstance(precision, int)):    
-            raise ESDataError('wrong format/unrecognised precision')
+            raise pyroError('wrong format/unrecognised precision')
         else:                                   
             return precision
     def setPrecision(self, precision):
@@ -286,8 +286,8 @@ class API(object):
     #/************************************************************************/
     @staticmethod
     def _get_status(status):
-        if status is None:                      raise ESDataError('unknown status')
-        elif not isinstance(status, int):       raise ESDataError('unrecognised status')
+        if status is None:                      raise pyroError('unknown status')
+        elif not isinstance(status, int):       raise pyroError('unrecognised status')
         else:                                   return status
     def setStatus(self, status):
         self._status=self._get_status(status)       
@@ -328,7 +328,7 @@ class API(object):
         if kwargs == {}:
             return None
         elif not('domain' in kwargs and 'vers' in kwargs and 'lang' in kwargs and 'fmt' in kwargs):
-            raise ESDataError('uncomplete information for building URL')
+            raise pyroError('uncomplete information for building URL')
         # set parameters
         vers=kwargs.pop('vers') 
         fmt=kwargs.pop('fmt') 
@@ -369,7 +369,7 @@ class API(object):
         try:            
             self.setUrl(**kwargs)
         except:
-            raise ESDataError('Request URL not (re)set')
+            raise pyroError('Request URL not (re)set')
     def get(self):
         """Get/retrieve the stored parameters: dataset, url (in this order).
         
@@ -401,7 +401,8 @@ class API(object):
 
     #/************************************************************************/
     def fetch(self, url=None):
-        """Fetch data from (well formed) URL to *Eurobase* 
+       pass
+       """Fetch data from (well formed) URL to *Eurobase* 
         
             >>> resp = x.fetch_data(url)
                 
@@ -432,7 +433,7 @@ class API(object):
         try:
             resp = response.read()
         except:
-            raise ESDataError('error reading URL')    
+            raise pyroError('error reading URL')    
         if fmt == 'json':
             resp = json.loads(resp)
         elif fmt == 'unicode':
@@ -452,9 +453,8 @@ class API(object):
                 try:        
                     return getattr(pyjstat, attr)
                 except:     
-                    raise ESDataError('method/attribute {} not implemented'.format(attr))
+                    raise pyroError('method/attribute {} not implemented'.format(attr))
        """
-       pass
       
       
 #==============================================================================

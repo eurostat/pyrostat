@@ -494,8 +494,7 @@ class Bulk(__Base):
         else:
             filename = '%s/%s.%s' % (bulk_dir, dimension or dataset, ext)
         url = self.build_url(file=filename)
-        pathname, html = self.session.load_page(self, url, **kwargs)
-        return pathname, html
+        return self.session.read_url_page(self, url, **kwargs)
 
     #/************************************************************************/
     def last_update(self, **kwargs):
@@ -562,22 +561,22 @@ class Bulk(__Base):
         url = self.build_url(dir=settings.BULK_DIR['data'])
         for alpha in list(string.ascii_lowercase):
             urlalpha = '{url}&start={alpha}'.format(url=url, alpha=alpha)
-            _, html = self.session.load_page(urlalpha)
+            _, html = self.session.__obsolete_load_page(urlalpha)
             if html is None or html == '':
                 raise pyroError('no HTML content found') 
             _, rows = self.session.read_soup_table(html, attrs={'class':'filelist'})
-            datasets += [d.split('.')[0] for d in self.__obsolete__filter_table(rows)]
+            datasets += [d.split('.')[0] for d in self.__obsolete_filter_table(rows)]
         return datasets
     def __obsolete_get_dimensions(self):
         url = self.build_url(lang=self.lang, dir=settings.BULK_DIR['dic'])
-        _, html = self.session.load_page(url)
+        _, html = self.session.__obsolete_load_page(url)
         if html is None or html == '':
             raise pyroError('no HTML content found') 
         _, rows = self.session.read_soup_table(html, attrs={'class':'filelist'})
-        dimensions = [d.split('.')[0] for d in self.__obsolete__filter_table(rows)]
+        dimensions = [d.split('.')[0] for d in self.__obsolete_filter_table(rows)]
         return dimensions
     @staticmethod
-    def __obsolete__filter_table(rows):
+    def __obsolete_filter_table(rows):
         rows = rows[0] # only one table in the page
         data, i = [], 0
         for row in rows:
@@ -892,10 +891,13 @@ class Meta(__Base):
         return [start, end]
     
 
-class Rest(__Base):
+class REST(__Base):
     """
 rest
 {host_url}/rest/data/{version}/{format}/{language}/{datasetCode}?{filters}
 http://ec.europa.eu/eurostat/wdds/ rest/data/v2.1/ json/en/ nama_gdp_c?precision=1&geo=EU28&unit=EUR_HAB&time=2010&time=2011&indic_na=B1GM
     """
+    pass    
+
+class NUTS(__Base):
     pass
