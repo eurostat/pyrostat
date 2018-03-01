@@ -17,11 +17,15 @@ Basic definitions for Eurobase API
 **Contents**
 """
 
+import os, sys
+import inspect
+from collections import OrderedDict, Mapping
+import logging
 
-from collections import OrderedDict
+from pyrostat import metadata
 
 #==============================================================================
-# GLOBAL CLASSES/METHODS/VARIABLES
+# GLOBAL VARIABLES
 #==============================================================================
 
 PACKAGE             = "pyrostat"
@@ -162,3 +166,117 @@ BS_PARSERS          = ("html.parser", "html5lib", "lxml", "xml")
 
 EXCEPTIONS          = {}
 
+LEVELS              = {'debug': logging.DEBUG,
+                       'info': logging.INFO,
+                       'warning': logging.WARNING,
+                       'error': logging.ERROR,#     
+                       'critical': logging.CRITICAL}
+"""Levels of warning/errors; default level is 'debug'."""
+
+LOG_FILENAME            = metadata.package + '.log'
+"""Log file name: where warning/info messages will be output."""
+
+#==============================================================================
+# ERROR/WARNING CLASSES
+#==============================================================================
+
+class pyroError(Exception):
+    """Base class for exceptions in this module."""
+    def __init__(self, msg, expr=None):    
+        self.msg = msg
+        if expr is not None:    self.expr = expr
+        Exception.__init__(self, msg)
+    def __str__(self):              return repr(self.msg)
+
+class pyroWarning(Warning):
+    """Base class for warnings in this module."""
+    def __init__(self, msg, expr=None):    
+        self.msg = msg
+        if expr is not None:    self.expr = expr
+        # logging.warning(self.msg)
+    def __repr__(self):             
+        return self.msg
+    def __str__(self):              return repr(self.msg)
+    
+#==============================================================================
+# LOGGER CLASS
+#==============================================================================
+    
+class pyroLogger(object): 
+    """Basic logger class.
+    """  
+    def __init__(self, **kwargs):    
+        self.logger = logging.getLogger() #'logging_kinki
+        if not self.logger.handlers: 
+            filename = kwargs.pop('filename',LOG_FILENAME)
+            self.logger.addHandler(logging.FileHandler(filename))
+            self.logger.setLevel(LEVELS[kwargs.pop('level','debug')])   
+    def close(self):    
+        for handler in self.logger.handlers[:]:
+            try:    handler.close() # FileHandler
+            except: handler.flush() # StreamHandler
+            self.logger.removeHandler(handler)
+    def __getattr__(self, method):
+        try:    return getattr(logging,method)
+        except: pass
+    
+LOGGER = pyroLogger()
+"""Logger object: where warning/info operations are defined."""
+
+#==============================================================================
+# GLOBAL CLASSES/METHODS/VARIABLES
+#==============================================================================
+
+def fileexists(file):
+    """Check file existence.
+    """
+    return os.path.exists(os.path.abspath(file))
+
+def clean_key_method(kwargs, method):
+    """Clean keyword parameters prior to be passed to a given method/function by
+    deleting all the keys that are not present in the signature of the method/function.
+    """
+    parameters = inspect.signature(method).parameters
+    keys = [key for key in kwargs.keys()                                          \
+            if key not in list(parameters.keys()) or parameters[key].KEYWORD_ONLY.value==0]
+    [kwargs.pop(key) for key in keys]
+    return kwargs
+
+def to_key_val_list(value):
+    """Take an object and test to see if it can be represented as a
+    dictionary. If it can be, return a list of tuples, e.g.,
+
+        >>> to_key_val_list([('key', 'val')])
+        [('key', 'val')]
+        >>> to_key_val_list({'key': 'val'})
+        [('key', 'val')]
+        >>> to_key_val_list('string')
+        ValueError: cannot encode objects that are not 2-tuples.
+    """
+    if value is None:
+        return None     
+    elif isinstance(value, (str, bytes, bool, int)):
+        raise ValueError('cannot encode objects that are not 2-tuples')     
+    elif isinstance(value, Mapping):
+        value = value.items()     
+    return list(value)
+
+def merge_dict(dnew, dold, dict_class=OrderedDict):
+    """Determine appropriate setting for a given request, taking into account
+    the explicit setting on that request, and the setting in the session. If a
+    setting is a dictionary, they will be merged together using `dict_class`
+    """
+    if dold is None:
+        return dnew
+    elif dnew is None:
+        return dold
+    elif not (isinstance(dold, Mapping) and isinstance(dnew, Mapping)):
+        return dnew
+    merged_dict = dict_class(to_key_val_list(dold))
+    merged_dict.update(to_key_val_list(dnew))
+    # remove keys that are set to None. Extract keys first to avoid altering
+    # the dictionary during iteration.
+    none_keys = [k for (k, v) in merged_dict.items() if v is None]
+    for key in none_keys:
+        del merged_dict[key]
+    return merged_dict
