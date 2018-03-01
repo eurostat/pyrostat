@@ -31,19 +31,27 @@ Basic class for common request operations
 *optional*:     <put_here_optional_modules>
                 :mod:`pickle`, :mod:`cPickle`
 
+
 **Contents**
+
+.. Links
+
+.. _requests_cache: https://pypi.python.org/pypi/requests-cache
+.. |requests_cache| replace:: `requests_cache module <requests_cache_>`_
+.. _cachecontrol: https://github.com/ionrock/cachecontrol
+.. |cachecontrol| replace:: `cachecontrol module <cachecontrol_>`_
+.. _bs4: https://pypi.python.org/pypi/beautifulsoup4
+.. |bs4| replace:: `beautifulsoup4 module <bs4_>`_
 """
   
 #==============================================================================
 # IMPORT STATEMENTS
 #==============================================================================
 
-import os, sys
-import StringIO
+import io, os, sys
 import warnings
 import time
 
-import inspect
    
 try:                                
     import requests # urllib2
@@ -51,38 +59,54 @@ except ImportError:
     raise IOError
 
 try:                                
-    import requests_cache # https://pypi.python.org/pypi/requests-cache
-except ImportError:          
-    pass
+    import requests_cache 
+except ImportError:
+    warnings.warn("missing requests_cache module - visit https://pypi.python.org/pypi/requests-cache", ImportWarning)
+    requests_cache = None          
     
+try:                                
+    import cachecontrol # https://github.com/ionrock/cachecontrol
+except ImportError:  
+    warnings.warn("missing requests_cache module - visit https://pypi.python.org/pypi/requests-cache", ImportWarning)
+    cachecontrol = None
+
 # Beautiful soup package
 try:                                
     import bs4
-except ImportError:                 
-    pass
+except ImportError: 
+    warnings.warn("missing requests_cache module - visit https://pypi.python.org/pypi/beautifulsoup4", ImportWarning)
+    bs4 = None                
    
 try:                                
     import simplejson as json
-except ImportError:          
-    import json
-else:
-    pass
+except ImportError:
+    warnings.warn("missing simplejson module - visit https://pypi.python.org/pypi/simplejson/", ImportWarning)
+    try:                                
+        import json
+    except ImportError: 
+        warnings.warn("json module missing in Python Standard Library", ImportWarning)
+        class json:
+            def loads(arg):  return '%s' % arg
 
 try:                                
     import datetime
 except ImportError:          
+    warnings.warn("datetime module missing in Python Standard Library", ImportWarning)
     class datetime:
         class timedelta: 
-            pass
+            def __init__(self,arg): return arg
     
 try:
     import hashlib
-except:
-    pass    
+except ImportError:
+    warnings.warn("hashlib module missing in Python Standard Library", ImportWarning)
+    hashlib = None
 
 try:
     import pandas as pd
 except ImportError:          
+    warnings.warn("missing pandas module - visit https://pandas.pydata.org", ImportWarning)
+    # raise IOError
     class pd:
         def read_table(*args, **kwargs): 
             raise IOError
@@ -109,8 +133,8 @@ except ImportError:
 # GLOBAL CLASSES/METHODS/VARIABLES
 #==============================================================================
 
-from . import pyroWarning, pyroError
 from . import settings
+from .settings import pyroWarning, pyroError
 
 
 #==============================================================================
@@ -122,6 +146,20 @@ class Session(object):
     """
     
     def __init__(self, **kwargs):
+        """
+        Keyword Arguments
+        ----------------- 
+        cache_store : str/bool
+            when set to `True` or a non-empty string, caching will be used; 
+            default: `False` and no caching operation is used during downloads
+        cache_backend : str
+        force_download : bool
+            flag set to force the download even if the file already exists in the 
+            cache; default: `False`
+        expire_after : int
+            how many seconds to store file on disk; if `None`, use default, if 0,
+            do not use cached version if any.
+        """
         # initial default settings
         self._session           = None
         self._cache             = True
@@ -130,53 +168,24 @@ class Session(object):
         self._expire_after      = None # datetime.deltatime(0)
         # update with keyword arguments passed
         if kwargs != {}:
-            attrs = ( '_expire_after','force_download','cache')
+            attrs = ('cache','cache_backend','expire_after','force_download')
             for attr in list(set(attrs).intersection(kwargs.keys())):
-                try:
-                    setattr(self, '{}'.format(attr), kwargs.get(attr))
-                except: 
-                    warnings.warn(pyroWarning('wrong attribute value {}'.format(attr.upper())))
+                setattr(self, '{}'.format(attr), kwargs.get(attr))
         # initialise
-        self.set(**kwargs)
+        self.initialise(**kwargs)
         
-    """
-    class _defaultErrorHandler(urllib2.HTTPDefaultErrorHandler):
-        def http_error_default(self, req, fp, code, msg, headers):
-            results = urllib2.HTTPError(req.get_full_url(), code, msg, headers, fp)
-            results.status = code
-            return results
-        
-    class _redirectHandler(urllib2.HTTPRedirectHandler):
-        def __init__ (self):
-            self.redirects = []
-        def http_error_301(self, req, fp, code, msg, headers):
-            results = urllib2.HTTPRedirectHandler.http_error_301(self, req, fp, code, msg, headers)
-            results.status = code
-            return results    
-        def http_error_302(self, req, fp, code, msg, headers):
-            results = urllib2.HTTPRedirectHandler.http_error_302(self, req, fp, code, msg, headers)
-            results.status = code
-            return results
-    
-    class _headRequest(urllib2.Request):
-        def get_method(self):
-            return "HEAD"
-        
-    """
-
     #/************************************************************************/
     @property
     def cache(self):
         return self._cache
     @cache.setter
     def cache(self, cache):
-        if isinstance(cache, str):
-            self._cache = os.path.abspath(cache)
-        elif isinstance(cache, bool):
-            self._cache = cache
-        else:
+        if not(cache is None or isinstance(cache, (str,bool))):
             raise pyroError('wrong type for CACHE_NAME parameter')
-        
+        else:
+            if cache not in (False,'',None) and requests_cache is None and cachecontrol is None:
+                raise pyroError('caching not supported in the absence of modules requests_cache and cachecontrol')                
+            self._cache = cache
 
     #/************************************************************************/
     @property
@@ -186,12 +195,16 @@ class Session(object):
     def cache_backend(self, backend):
         if backend is None:
             self._cache_backend = 'sqlite' # None
-        elif backend in ('sqlite', 'memory', 'dict', 'file', 'redis', 'mongo'):
-            self._cache_backend = backend
         elif not isinstance(backend, str):
             raise pyroError('wrong type for CACHE_BACKEND parameter')
-        elif backend is not None:
-            raise pyroError('wrong backend setting for CACHE_BACKEND parameter')
+        elif backend.lower() in ('sqlite', 'memory', 'dict', 'file', 'redis', 'mongo'):
+            if backend.lower() in ('sqlite', 'memory', 'redis', 'mongo') and requests_cache is None:
+                raise pyroError('backend not supported in the absence of module requests_cache')                
+            elif backend.lower() in ('dict', 'file') and cachecontrol is None:
+                raise pyroError('backend not supported in the absence of module cachecontrol')                
+            self._cache_backend = backend.lower()
+        else:
+            raise pyroError('wrong backend definition for CACHE_BACKEND parameter')
 
     #/************************************************************************/
     @property
@@ -212,41 +225,65 @@ class Session(object):
         return self._force_download
     @force_download.setter
     def force_download(self, force_download):
-        if not isinstance(force_download, bool):
+        if not(force_download is None or isinstance(force_download, bool)):
             raise pyroError('wrong type for FORCE_DOWNLOAD parameter')
         self._force_download = force_download
         
     #/************************************************************************/
-    def get(self, **kwargs):
+    @property
+    def session(self):
+        return self._session
+    def initialise(self, **kwargs):
+        """Determines appropriate setting for a given session, taking into account
+        the explicit setting on that request, and the setting in the session. If a
+        setting is a dictionary, they will be merged together.
+        """
         cache = kwargs.pop('cache', None)
+        backend = kwargs.pop('cache_backend',None) or self.cache_backend
+        if not (backend is None or isinstance(backend, str)                                                        \
+                and backend.lower() in ('sqlite', 'memory', 'dict', 'file', 'redis', 'mongo')):
+            raise pyroError('wrong setting for CACHE_BACKEND parameter')
+        expire_after = kwargs.get('expire_after') or self.expire_after
+        if not (expire_after is None or  isinstance(expire_after, (int, datetime.timedelta))):
+            raise pyroError('wrong setting for EXPIRE_AFTER parameter')
         if cache is None or (cache is False and self.cache in (None,False)): 
-\            try:
-                session = requests.session(**kwargs)
+            try:
+                session = requests.Session()
+                # session = requests.session(**kwargs)
             except:
                 session = None
-                pass
         else:
             if cache is None and not self.cache in (None,False):
                 cache = self.cache   
             if cache is True:
                 cache = self.__default_cache()
-            try:
-                kwargs.update({'expire_after': kwargs.get('expire_after') or self.expire_after,
-                                   'backend': kwargs.pop('cache_backend',None) or self.cache_backend})
-                session = requests_cache.CachedSession(cache_name=cache, **kwargs)
-            except:
-                session = None
-                pass
-        return session
-    def set(self, **kwargs):
+            if backend.lower() == 'file':
+                try:
+                    if int(expire_after) <= 0:
+                        cache = cachecontrol.FileCache(os.path.abspath(cache), forever=True)
+                    else:
+                        cache = cachecontrol.FileCache(os.path.abspath(cache))  
+                    session = cachecontrol.CacheControl(requests.Session(), cache)
+                except:
+                    session = None
+            elif backend.lower() == 'dict': # really needed? see 'memory' in requests_cache
+                try:
+                    cache = cachecontrol.DictCache()                        
+                    session = cachecontrol.CacheControl(requests.Session(), cache)
+                except:
+                    session = None
+            else:
+                try:
+                    kwargs.update({'expire_after': expire_after, 'backend': backend})
+                    session = requests_cache.CachedSession(cache_name=cache, **kwargs)
+                except:
+                    session = None
         try:
-            self._session = self.get(**kwargs)
-            assert self._session is not None
+            assert session is not None
         except:
-            raise pyroError('wrong definition for SESSION parameter')
-    @property
-    def session(self):
-        return self._session
+            raise pyroError('wrong definition for SESSION parameters - SESSION not initialised')
+        else:
+            self._session = session
         
     #/************************************************************************/
     @classmethod
@@ -391,11 +428,20 @@ class Session(object):
         --------
         """
         cache = kwargs.pop('cache',None)
+        backend = kwargs.pop('cache_backend',None) or self.cache_backend
+        if backend is not None and not (isinstance(backend, str) 
+                and backend.lower() in ('sqlite', 'memory', 'dict', 'file', 'redis', 'mongo')):
+            raise pyroError('wrong setting for CACHE_BACKEND parameter')
         force_download = kwargs.pop('force_download', False)
+        if not isinstance(force_download, bool):
+            raise pyroError('wrong type for FORCE_DOWNLOAD parameter')
         try:
-            if cache is None or (force_download is True and self.cache in (None,False)):
+            if cache is None                                                    \
+                    or (force_download is True and self.cache in (None,False))  \
+                    or backend.lower() in ('dict','file'):
                 response = self._session.get(url)                
-            elif (cache is False and self.cache not in (None,False)) or force_download is True:
+            elif (cache is False and self.cache not in (None,False))            \
+                    or force_download is True:
                 with requests_cache.disabled():
                     response = self._session.get(url)                
             elif self.cache in (None,False):
@@ -430,130 +476,32 @@ class Session(object):
             try:    msg=msg['error']['label']
             except: pass
         return status, msg
-                        
-    #/************************************************************************/
-    def load_page(self, url, **kwargs):
-        """Download url from internet and store the downloaded content into <cache>/file.
-        If <cache>/file already exists, it returns content from disk
-        
-            >>> page = S.load_page(url, cache_download=False, time_out=0)
-        
-        Argunent
-        --------
-        url : str
-            basic URL path of the page to be downloaded.
-
-        Keyword Arguments
-        ----------------- 
-        force_download : bool
-            flag set to force the download even if the file already exists in the 
-            cache; default: `False`
-        cache_store : str/bool
-            directory where to store (cache) the content of URL; when set to `True`, 
-            a default cache directory is defined; default: `False` and not cache is
-            used for storage
-        time_out : int
-            how many seconds to store file on disk; if `None`, use default , if 0,
-            don't use cached version if any.
-            
-        Returns
-        -------
-        page : str
-            the content of the URL `url`.
-        """
-        # create cache directory only the fist time it is needed
-        # note: html must be a str type not byte type
-        cache_store = kwargs.get('cache_store') or self.cache_store or False
-        force_download = kwargs.get('force_download') or self.force_download or False
-        time_out = kwargs.get('time_out') or self.time_out or 0
-        if isinstance(cache_store, bool) and cache_store is True:
-            cache_store = self.__default_cache()
-        pathname = self.__build_pathname(url, cache_store)
-        if force_download is True or not self.__is_cached(pathname, time_out):
-            response = self.get_response(url)
-            html = response.text
-            if cache_store is not None:
-                if not os.path.exists(cache_store):
-                    os.makedirs(cache_store)
-                elif not os.path.isdir(cache_store):
-                    raise pyroError('cache {} is not a directory'.format(cache_store))
-                self.__write_to_pathname(pathname, html)
-        else:
-            if not os.path.exists(cache_store) or not os.path.isdir(cache_store):
-                raise pyroError('cache {} is not a directory'.format(cache_store))
-            html = self.__read_from_pathname(pathname)
-        return pathname, html
-    @staticmethod
-    def __build_pathname(url, cache):
-        """Build unique filename from URL name and cache directory, _e.g._ using 
-        hashlib encoding.
-        """
-        pathname = url.encode('utf-8')
-        try:
-            pathname = hashlib.md5(pathname).hexdigest()
-        except:
-            pathname = pathname.hex()
-        if cache not in (False,''):
-            pathname = os.path.join(cache, pathname)
-        return pathname
-    @staticmethod
-    def __write_to_pathname(path, content):
-        """Write "content" to a given pathname.
-        """
-        with open(path, 'w') as f:
-            f.write(content)
-            f.close()  
-        return
-    @staticmethod
-    def __dump_to_pathname(path, content, protocol=2):
-        """Dump "content" to a given pathname.
-        """
-        with open(path, 'wb') as f:
-            pickle.dump(content, f, protocol=protocol)
-            f.close()  
-        return
-    @staticmethod
-    def __read_from_pathname(path):
-        """Read "content" from a given pathname.
-        """
-        with open(path, 'r') as f:
-            content = f.read()
-            f.close()
-        return content
-    @staticmethod
-    def __load_from_pathname(path):
-        """Load "content" from a given pathname.
-        """
-        with open(path, 'rb') as f:
-            try:
-                content = pickle.load(f, encoding="ascii", errors="replace")
-            except TypeError:
-                content = pickle.load(f)
-            f.close()
-        return content
-       
-    #/************************************************************************/
-    @staticmethod
-    def __fileexists(file):
-        """Check file existence.
-        """
-        return os.path.exists(os.path.abspath(file))
 
     #/************************************************************************/
     @staticmethod
-    def __default_cache():
+    def __default_cache(backend='sqlite'):
         """Create default pathname for cache directory depending on OS platform.
         Inspired by `Python` package `mod:wbdata`: default path defined for 
         `property:path` property of `class:Cache` class.
         """
-        platform = sys.platform
-        if platform.startswith("win"): # windows
-            basedir = os.getenv("LOCALAPPDATA",os.getenv("APPDATA",os.path.expanduser("~")))
-        elif platform.startswith("darwin"): # Mac OS
-            basedir = os.path.expanduser("~/Library/Caches")
-        else:
-            basedir = os.getenv("XDG_CACHE_HOME",os.path.expanduser("~/.cache"))
-        return os.path.join(basedir, settings.PACKAGE)    
+        if not isinstance(backend,str):
+            raise pyroError('wrong type for BACKEND parameter')
+        elif not backend.lower() in ('sqlite', 'memory', 'dict', 'file', 'redis', 'mongo'):
+            raise pyroError('wrong definition for BACKEND parameter')
+        elif backend.lower() == 'file':
+            platform = sys.platform
+            if platform.startswith("win"): # windows
+                basedir = os.getenv("LOCALAPPDATA",os.getenv("APPDATA",os.path.expanduser("~")))
+            elif platform.startswith("darwin"): # Mac OS
+                basedir = os.path.expanduser("~/Library/Caches")
+            else:
+                basedir = os.getenv("XDG_CACHE_HOME",os.path.expanduser("~/.cache"))
+            return os.path.join(basedir, settings.PACKAGE)    
+        elif backend.lower() in ('memory','dict'):
+            return 'eurobase'
+        elif backend in ('sqlite','redis','mongo'):
+            return 'eurobase'
+            
     @staticmethod
     def __is_cached(pathname, time_out):
         """Check whether a URL exists and is alread cached.
@@ -578,6 +526,97 @@ class Session(object):
         :returns: True if the file can be retrieved from the disk (cache)
         """
         return self.__is_cached(self.__build_pathname(url, self.cache), self.time_out)
+                        
+    #/************************************************************************/
+    def __obsolete_load_page(self, url, **kwargs):
+        """Download url from internet and store the downloaded content into <cache>/file.
+        If <cache>/file already exists, it returns content from disk
+        
+            >>> page = S.__obsolete_load_page(url, cache_download=False, time_out=0)
+        """
+        # create cache directory only the fist time it is needed
+        # note: html must be a str type not byte type
+        cache_store = kwargs.get('cache_store') or self.cache_store or False
+        force_download = kwargs.get('force_download') or self.force_download or False
+        time_out = kwargs.get('time_out') or self.time_out or 0
+        if isinstance(cache_store, bool) and cache_store is True:
+            cache_store = self.__default_cache()
+        pathname = self.__build_pathname(url, cache_store)
+        if force_download is True or not self.__is_cached(pathname, time_out):
+            response = self.get_response(url)
+            html = response.text
+            if cache_store is not None:
+                if not os.path.exists(cache_store):
+                    os.makedirs(cache_store)
+                elif not os.path.isdir(cache_store):
+                    raise pyroError('cache {} is not a directory'.format(cache_store))
+                self.__write_to_pathname(pathname, html)
+        else:
+            if not os.path.exists(cache_store) or not os.path.isdir(cache_store):
+                raise pyroError('cache {} is not a directory'.format(cache_store))
+            html = self.__read_from_pathname(pathname)
+        return pathname, html
+    @staticmethod
+    def __obsolete_build_pathname(url, cache):
+        """Build unique filename from URL name and cache directory, _e.g._ using 
+        hashlib encoding.
+        """
+        pathname = url.encode('utf-8')
+        try:
+            pathname = hashlib.md5(pathname).hexdigest()
+        except:
+            pathname = pathname.hex()
+        if cache not in (False,''):
+            pathname = os.path.join(cache, pathname)
+        return pathname
+    @staticmethod
+    def __obsolete_write_to_pathname(path, content):
+        """Write "content" to a given pathname.
+        """
+        with open(path, 'w') as f:
+            f.write(content)
+            f.close()  
+        return
+    @staticmethod
+    def __obsolete_dump_to_pathname(path, content, protocol=2):
+        """Dump "content" to a given pathname.
+        """
+        with open(path, 'wb') as f:
+            pickle.dump(content, f, protocol=protocol)
+            f.close()  
+        return
+    @staticmethod
+    def __obsolete_read_from_pathname(path):
+        """Read "content" from a given pathname.
+        """
+        with open(path, 'r') as f:
+            content = f.read()
+            f.close()
+        return content
+    @staticmethod
+    def __obsolete_load_from_pathname(path):
+        """Load "content" from a given pathname.
+        """
+        with open(path, 'rb') as f:
+            try:
+                content = pickle.load(f, encoding="ascii", errors="replace")
+            except TypeError:
+                content = pickle.load(f)
+            f.close()
+        return content
+                        
+    #/************************************************************************/
+    def read_url_page(self, url, **kwargs):
+        """Download url from internet and store the downloaded content into <cache>/file.
+        If <cache>/file already exists, it returns content from disk
+        
+        """
+        try:
+            self.get_status(url)
+        except:
+            return None
+        response = self.get_response(url)
+        return response.text
         
     #/************************************************************************/
     @classmethod
@@ -634,32 +673,34 @@ class Session(object):
         return headers, rows
                
     #/************************************************************************/
-    def read_html_table(self, url, **kwargs): 
+    def read_html_table(self, url, **kwargs) ->pd.DataFrame: 
         try:
             self.get_status(url)
         except:
             return None
         try:
             req = self.get(url)
-            content = StringIO.StringIO(req.content)
+            content = io.StringIO(req.content)
         except:
             raise pyroError('wrong request')
         # set some default values (some are already default values for read_table)
         kwargs.update({'encoding': kwargs.get('encoding') or None})
-        [kwargs.pop(key) for key in kwargs                                          \
-             if key not in list(inspect.signature(pandas.read_table).parameters.keys())]
+        kwargs = settings.clean_key_method(kwargs, pd.read_html)
         # run pandas...
         return pd.read_html(content, **kwargs)
                
     #/************************************************************************/
-    def read_url_table(self, url, **kwargs) ->pd.Dataframe: 
+    def read_url_table(self, url, **kwargs) ->pd.DataFrame: 
         try:
             self.get_status(url)
         except:
             return None
+        # because we want to have the same backend property for the READ_URL_TABLE
+        # method, we will apply READ_TABLE on whatever is loaded from the current 
+        # session request instead of the url directly
         try:
             req = self.get(url, **kwargs)
-            content = StringIO.StringIO(req.content)
+            content = io.StringIO(req.content)
         except:
             raise pyroError('wrong request')
         # set some default values (some are already default values for read_table)
@@ -669,11 +710,10 @@ class Session(object):
                         'error_bad_lines': kwargs.get('error_bad_lines') or False, 
                         'warn_bad_lines': kwargs.get('warn_bad_lines') or True,
                         'compression': kwargs.get('compression') or 'infer'})
-        parameters = inspect.signature(pandas.read_table).parameters
-        keys = [key for key in kwargs.keys()                                          \
-             if key not in list(parameters.keys()) or parameters[key].KEYWORD_ONLY.value==0]
-        [kwargs.pop(key) for key in keys]
+        kwargs = settings.clean_key_method(kwargs, pd.read_table)
         # run pandas...
         df = pd.read_table(content, **kwargs)
+        # and not: df = pd.read_table(url, **kwargs)
         return df
 
+    
