@@ -9,8 +9,12 @@ Interface to the REST API providing access to Eurostat online database.
 This module will enable you to automatically query, search, download and handle data from the [online database](http://ec.europa.eu/eurostat/data/database) of [_Eurostat_](http://ec.europa.eu/eurostat/).
 
 <table align="center">
-    <tr> <td align="left"><i>documentation</i></td> <td align="left">available at: https://gjacopo.github.io/esdata/</td> </tr> 
-    <tr> <td align="left"><i>since</i></td> <td align="left">2017</td> </tr> 
+    <tr> <td align="left"><i>documentation</i></td> <td align="left">available at: https://eurostat.github.io/pyrostat/</td> </tr> 
+    <tr> <td align="left"><i>status</i></td> <td align="left">since 2017</td> </tr> 
+    <tr> <td align="left"><i>contributors</i></td> 
+    <td align="left" valign="middle">
+<a href="https://github.com/gjacopo"><img src="https://github.com/gjacopo.png" width="40"></a>
+</td> </tr> 
     <tr> <td align="left"><i>license</i></td> <td align="left"><a href="https://joinup.ec.europa.eu/sites/default/files/eupl1.1.-licence-en_0.pdfEUPL">EUPL</a> </td> </tr> 
 </table>
 
