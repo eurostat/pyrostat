@@ -17,7 +17,7 @@ Basic definitions for Eurobase API
 **Contents**
 """
 
-import os, sys
+import os, sys#analysis:ignore
 import inspect
 from collections import OrderedDict, Mapping
 import logging
@@ -28,13 +28,18 @@ from pyrostat import metadata
 # GLOBAL VARIABLES
 #==============================================================================
 
+API_HISTORY         = {'first': 1,
+                       'new': 2}
+API_VERSIONS        = list(API_HISTORY.values())
+
 PACKAGE             = "pyrostat"
 
 PROTOCOLS           = ('http', 'https', 'ftp')
 """
 Recognised protocols (API, bulk downloads,...).
 """
-DEF_PROTOCOL        = 'http'
+DEF_PROTOCOL        = {API_HISTORY['first']: 'http', 
+                       API_HISTORY['new']:'https'}
 PROTOCOL            = DEF_PROTOCOL
 """
 Default protocol used by the API.
@@ -43,51 +48,63 @@ LANGS               = ('en','de','fr')
 """
 Languages supported by this package.
 """
-DEF_LANG            = 'en'
+DEF_LANG            = {API_HISTORY['first']: 'en', 
+                       API_HISTORY['new']: 'en'}
 """
 Default language used when launching Eurostat API.
 """
 
-EC_URL              = 'ec.europa.eu'
+EC_URL              = {API_HISTORY['first']: 'ec.europa.eu', 
+                       API_HISTORY['new']: 'webgate.acceptance.ec.europa.eu'}
 """
 European Commission URL.
 """
-ESTAT_DOMAIN        = 'eurostat' 
+ESTAT_DOMAIN        = {API_HISTORY['first']: 'eurostat', 
+                       API_HISTORY['new']: 'estat'}
 """
 Eurostat domain under European Commission URL.
 """
 # ESTAT_URL           = '%s://%s/%s' % (PROTOCOL, EC_URL, ESTAT_DOMAIN)
-ESTAT_URL           = '%s/%s' % (EC_URL, ESTAT_DOMAIN)
+ESTAT_URL           = {t[0]: '%s/%s' % (t[1],t[2])                  \
+                       for t in [[*x[0], x[1]] for x in zip(EC_URL.items(), ESTAT_DOMAIN.values())]
+                       } 
 """
 Eurostat complete URL.
 """
 
-API_SUBDOMAIN       = 'wdds/rest/data'
+API_SUBDOMAIN       = {API_HISTORY['first']: 'wdds/rest/data',
+                       API_HISTORY['new']: 'api/dissemination/sdmx'}
 """
 Subdomain of Eurostat API.
 """
-API_DOMAIN          = '%s/%s' % (ESTAT_URL, API_SUBDOMAIN)
+API_DOMAIN          = {t[0]: '%s/%s' % (t[1],t[2])                  \
+                       for t in [[*x[0], x[1]] for x in zip(ESTAT_URL.items(), API_SUBDOMAIN.values())]
+                       }
 """
 Domain of Eurostat API.
 """
-API_VERS            = 2.1
+REST_VERSION        = {API_HISTORY['first']: 2.1,
+                       API_HISTORY['new']: 2.1}
 """
-Version of Eurostat API.
+Version of Eurostat REST API.
 """
-API_PRECISION       = 1 # only available at the moment? 
+API_PRECISION       = {API_HISTORY['first']: 1, # only available at the moment? 
+                       API_HISTORY['new']: None}
 """
 Precision of data fetched through Eurostat API. 
 """
-API_FMTS            = ('json', 'unicode')
+API_FMTS            = {API_HISTORY['first']: ('json', 'sdmx', 'unicode'),
+                       API_HISTORY['new']: ('json', 'sdmx', 'dcat')}
 """
 Formats supported by Eurostat API. 
 """
-API_LANGS           = ('en','de','fr')
+API_LANGS           = {k: ('en','de','fr') for k in (1,2)}
 """
 Languages supported by Eurostat API.
 """
 
-DEF_SORT            = 1
+DEF_SORT            = {API_HISTORY['first']: 1,
+                       API_HISTORY['new']: None}
 """
 Default sort value.
 """
@@ -222,6 +239,27 @@ class pyroLogger(object):
     
 LOGGER = pyroLogger()
 """Logger object: where warning/info operations are defined."""
+
+        
+#==============================================================================
+# OBSOLETE CLASS
+#==============================================================================
+class pyroObsolete(object):
+    """Basic class used to specify obsolete methods and/or class.
+    """
+    def __init__(self, func, *args, **kwargs):
+        self.func = func
+        self.method_type = ( 
+                'staticmethod' if isinstance(self.func, staticmethod) else
+                'classmethod' if isinstance(self.func, classmethod) else
+                'property' if isinstance(self.func, property) else 
+                'instancemethod' # 'function'
+                )
+    def __call__(self, *args, **kwargs):
+        
+        raise IOError('Method %s is now obsolete' % self.func.__name__)
+    def __repr__(self):
+        return self.func.__repr__()
 
 #==============================================================================
 # GLOBAL CLASSES/METHODS/VARIABLES
