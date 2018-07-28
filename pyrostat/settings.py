@@ -6,16 +6,11 @@
 
 Basic definitions for Eurobase API
 
-**About**
-
-*credits*:      `grazzja <jacopo.grazzini@ec.europa.eu>`_ 
-
-*version*:      0.1
---
-*since*:        Tue Jan  3 23:52:40 2017
-
 **Contents**
 """
+
+# *credits*:      `gjacopo <jacopo.grazzini@ec.europa.eu>`_ 
+# *since*:        Tue Jan  3 23:52:40 2017
 
 import os, sys#analysis:ignore
 import inspect
@@ -318,3 +313,4 @@ def merge_dict(dnew, dold, dict_class=OrderedDict):
     for key in none_keys:
         del merged_dict[key]
     return merged_dict
+
