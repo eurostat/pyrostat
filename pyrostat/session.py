@@ -2,23 +2,15 @@
 # -*- coding: utf-8 -*-
 
 """
-.. session.py
+.. mod_session.py
 
 Basic class for common request operations 
-
-**About**
-
-*credits*:      `gjacopo <jacopo.grazzini@ec.europa.eu>`_ 
-
-*version*:      0.1
---
-*since*:        Wed Jan  4 01:49:11 2017
 
 **Description**
 
 **Usage**
 
-    >>> <put_here_an_example>
+    >>> from session import Session
     
 **Dependencies**
 
@@ -43,40 +35,83 @@ Basic class for common request operations
 .. _bs4: https://pypi.python.org/pypi/beautifulsoup4
 .. |bs4| replace:: `beautifulsoup4 module <bs4_>`_
 """
-  
+
+# *credits*:      `gjacopo <jacopo.grazzini@ec.europa.eu>`_ 
+# *since*:        Wed Jan  4 01:49:11 2017
+
+__all__         = ['Session']
+ 
+#%%
 #==============================================================================
 # IMPORT STATEMENTS
 #==============================================================================
 
+# generic import
 import io, os, sys
 import warnings
 import time
 
+
+# local imports
+from . import settings
+from .settings import pyroWarning, pyroError, pyroVerbose
    
-try:                                
+# requirements
+
+try:                
+    SERVICE_AVAILABLE = True                
     import requests # urllib2
 except ImportError:                 
-    raise IOError
+    SERVICE_AVAILABLE = False                
+    pyroWarning('REQUESTS package (https://pypi.python.org/pypi/requests/) not loaded - GISCO ONLINE service will not be accessed')
 
 try:                                
     import requests_cache 
 except ImportError:
-    warnings.warn("missing requests_cache module - visit https://pypi.python.org/pypi/requests-cache", ImportWarning)
-    requests_cache = None          
+    REQUESTS_CACHE_INSTALLED = False
+    pyroWarning("REQUESTS_CACHE package (https://pypi.python.org/pypi/requests-cache) not loaded", ImportWarning)
+else:
+    REQUESTS_CACHE_INSTALLED = True
+    pyroVerbose('REQUESTS_CACHE help: http://requests-cache.readthedocs.io/en/latest/')
     
 try:                                
-    import cachecontrol # https://github.com/ionrock/cachecontrol
+    import cachecontrol#analysis:ignore
 except ImportError:  
-    warnings.warn("missing requests_cache module - visit https://pypi.python.org/pypi/requests-cache", ImportWarning)
-    cachecontrol = None
-
+    CACHECONTROL_INSTALLED = False
+    pyroWarning("CACHECONTROL package (visit https://pypi.python.org/pypi/requests-cache) not loaded", ImportWarning)
+    try:
+        class ForceCacheResponse(requests.Response):
+            pass
+    except:
+        class ForceCacheResponse(object):
+            pass
+    def __init(inst, url, content):
+        super(ForceCacheResponse,inst).__init__(inst)
+        inst.url = url
+        inst.reason, inst.status_code = "OK", 200
+        inst._content, inst._content_consumed = content, True
+        # self._encoding = ?
+    ForceCacheResponse.__init__ = classmethod(__init)
+else:
+    CACHECONTROL_INSTALLED = True
+    pyroVerbose('CACHECONTROL help: https://cachecontrol.readthedocs.io/en/latest/')
+    from cachecontrol import CacheControl
+    from cachecontrol.caches import FileCache
+    try:
+        import fasteners#analysis:ignore
+        #import lockfile#deprecated
+    except ImportError:  
+        pyroWarning("FASTENERS package (https://pypi.org/project/fasteners/) not loaded", ImportWarning)
+    
 # Beautiful soup package
 try:                                
     import bs4
 except ImportError: 
-    warnings.warn("missing requests_cache module - visit https://pypi.python.org/pypi/beautifulsoup4", ImportWarning)
-    bs4 = None                
-   
+    BSOUP_INSTALLED = False
+    pyroWarning("missing requests_cache module - visit https://pypi.python.org/pypi/beautifulsoup4", ImportWarning)
+else:
+    BSOUP_INSTALLED = True
+
 try:                                
     import simplejson as json
 except ImportError:
@@ -91,7 +126,7 @@ except ImportError:
 try:                                
     import datetime
 except ImportError:          
-    warnings.warn("datetime module missing in Python Standard Library", ImportWarning)
+    pyroWarning("DATETIME module missing in Python Standard Library", ImportWarning)
     class datetime:
         class timedelta: 
             def __init__(self,arg): return arg
@@ -128,13 +163,6 @@ try: # Python doesn't pickle method instance by default
     copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 except ImportError:
     pass
-
-#==============================================================================
-# GLOBAL CLASSES/METHODS/VARIABLES
-#==============================================================================
-
-from . import settings
-from .settings import pyroWarning, pyroError
 
 
 #==============================================================================
