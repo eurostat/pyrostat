@@ -193,17 +193,159 @@ LEVELS              = {'debug': logging.DEBUG,
 LOG_FILENAME            = metadata.package + '.log'
 """Log file name: where warning/info messages will be output."""
 
+#%%
 #==============================================================================
-# ERROR/WARNING CLASSES
+# CLASSES pyroError/pyroWarning/pyroVerbose
 #==============================================================================
 
-class pyroError(Exception):
-    """Base class for exceptions in this module."""
-    def __init__(self, msg, expr=None):    
-        self.msg = msg
+class pyroWarning(Warning):
+    """Dummy class for warnings in this package.
+    
+        >>> pyroWarning(warnmsg, expr=None)
+
+    Arguments
+    ---------
+    warnmsg : str
+        warning message to display.
+        
+    Keyword arguments
+    -----------------
+    expr : str 
+        input expression in which the warning occurs; default: :data:`expr` is 
+        :data:`None`.
+        
+    Example
+    -------
+    
+    ::
+        
+        >>> pyroWarning('This is a very interesting warning');
+            pyroWarning: ! This is a very interesting warning !
+    """
+    def __init__(self, warnmsg, expr=None):    
+        self.warnmsg = warnmsg
         if expr is not None:    self.expr = expr
-        Exception.__init__(self, msg)
-    def __str__(self):              return repr(self.msg)
+        else:                   self.expr = '' 
+        # warnings.warn(self.msg)
+        print(self)
+    def __repr__(self):             return self.msg
+    def __str__(self):              
+        #return repr(self.msg)
+        return ( 
+                "! %s%s%s !" %
+                (self.warnmsg, 
+                 ' ' if self.warnmsg and self.expr else '',
+                 self.expr
+                 )
+            )
+                
+VERBOSE             = False
+    
+class pyroVerbose(object):
+    """Dummy class for verbose printing mode in this package.
+    
+    ::
+    
+        >>> pyroVerbose(msg, verb=True, expr=None)
+
+    Arguments
+    ---------
+    msg : str
+        verbose message to display.
+        
+    Keyword arguments
+    -----------------
+    verb : bool
+        flag set to :data:`True` when the string :literal:`[verbose] -` is added
+        in front of each verbose message displayed.
+    expr : str 
+        input expression in which the verbose mode is called; default: :data:`expr` is 
+        :data:`None`.
+        
+    Example
+    -------
+    
+    ::
+
+        >>> pyroVerbose('The more we talk, we less we do...', verb=True);
+            [verbose] - The more we talk, we less we do...
+    """
+    def __init__(self, msg, expr=None, verb=VERBOSE):    
+        self.msg = msg
+        if verb is True:
+            print('\n[verbose] - %s' % self.msg)
+        if expr is not None:    self.expr = expr
+    #def __repr__(self):             
+    #    return self.msg
+    def __str__(self):              
+        return repr(self.msg)
+    
+class pyroError(Exception):
+    """Dummy class for exception raising in this package.
+    
+    ::
+    
+        >>> raise pyroError(errmsg, errtype=None, errcode=None, expr='')
+
+    Arguments
+    ---------
+    errmsg : str
+        message -- explanation of the error.
+        
+    Keyword arguments
+    -----------------
+    errtype : object
+        error type; when :data:`errtype` is left to :data:`None`, the system tries
+        to retrieve automatically the error type using :data:`sys.exc_info()`.
+    errcode : (float,int)
+        error code; default: :data:`errcode` is :data:`None`.
+    expr : str 
+        input expression in which the error occurred; default: :data:`expr` is 
+        :data:`None`.
+        
+    Example
+    -------
+    
+    ::
+        
+        >>> try:
+                assert False
+            except:
+                raise pyroError('It is False')
+            Traceback ...
+            ...
+            pyroError: !!! AssertionError: It is False !!!
+    """
+    
+    def __init__(self, errmsg, errtype=None, errcode=None, expr=''):   
+        self.errmsg = errmsg
+        if expr is not None:        self.expr = expr
+        else:                       self.expr = '' 
+        if errtype is None:
+            try:
+                errtype = sys.exc_info()[0]
+            except:
+                pass
+        if inspect.isclass(errtype):            self.errtype = errtype.__name__
+        elif isinstance(errtype, (int,float)):  self.errtype = str(errtype)
+        else:                               self.errtype = errtype
+        if errcode is not None:     self.errcode = str(errcode)
+        else:                       self.errcode = ''
+        # super(happyError,self).__init__(self, msg)
+
+    def __str__(self):              
+        # return repr(self.msg)
+        return ( 
+                "!!! %s%s%s%s%s%s%s !!!" %
+                (self.errtype or '', 
+                 ' ' if self.errtype and self.errcode else '',
+                 self.errcode or '',
+                 ': ' if (self.errtype or self.errcode) and (self.errmsg or self.expr) else '',
+                 self.errmsg or '', 
+                 ' ' if self.errmsg and self.expr else '',
+                 self.expr or '' #[' ' + self.expr if self.expr else '']
+                 )
+            )
 
 class pyroWarning(Warning):
     """Base class for warnings in this module."""
