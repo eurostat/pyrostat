@@ -4,8 +4,22 @@
 """
 .. mod_session.py
 
+.. Links
+
+<<<<<<< HEAD
+=======
+.. _requests_cache: https://pypi.python.org/pypi/requests-cache
+.. |requests_cache| replace:: `requests_cache module <requests_cache_>`_
+.. _cachecontrol: https://github.com/ionrock/cachecontrol
+.. |cachecontrol| replace:: `cachecontrol module <cachecontrol_>`_
+.. _bs4: https://pypi.python.org/pypi/beautifulsoup4
+.. |bs4| replace:: `beautifulsoup4 module <bs4_>`_
+
 Basic class for common request operations 
 
+**About**
+
+>>>>>>> 623b743157e01cc3ce95ac807e3491a498b47207
 **Description**
 
 **Usage**
@@ -16,32 +30,25 @@ Basic class for common request operations
 
 *call*:         :mod:`settings`
 
-*require*:      <put_here_required_modules>
-                :mod:`os`, :mod:`sys`, :mod:`string`, :mod:`inspect`, :mod:`warnings`, \ 
+*require*:      :mod:`os`, :mod:`sys`, :mod:`string`, :mod:`inspect`, :mod:`warnings`, \ 
                 :mod:`re`, :mod:`math`, :mod:`operator`, :mod:`itertools`, :mod:`collections`
                 
-*optional*:     <put_here_optional_modules>
-                :mod:`pickle`, :mod:`cPickle`
+*optional*:     :mod:`pickle`, :mod:`cPickle`
 
 
 **Contents**
-
-.. Links
-
-.. _requests_cache: https://pypi.python.org/pypi/requests-cache
-.. |requests_cache| replace:: `requests_cache module <requests_cache_>`_
-.. _cachecontrol: https://github.com/ionrock/cachecontrol
-.. |cachecontrol| replace:: `cachecontrol module <cachecontrol_>`_
-.. _bs4: https://pypi.python.org/pypi/beautifulsoup4
-.. |bs4| replace:: `beautifulsoup4 module <bs4_>`_
 """
 
 # *credits*:      `gjacopo <jacopo.grazzini@ec.europa.eu>`_ 
 # *since*:        Wed Jan  4 01:49:11 2017
+<<<<<<< HEAD
 
 __all__         = ['Session']
  
 #%%
+=======
+  
+>>>>>>> 623b743157e01cc3ce95ac807e3491a498b47207
 #==============================================================================
 # IMPORT STATEMENTS
 #==============================================================================
@@ -68,15 +75,24 @@ except ImportError:
 try:                                
     import requests_cache 
 except ImportError:
+<<<<<<< HEAD
     REQUESTS_CACHE_INSTALLED = False
     pyroWarning("REQUESTS_CACHE package (https://pypi.python.org/pypi/requests-cache) not loaded", ImportWarning)
 else:
     REQUESTS_CACHE_INSTALLED = True
     pyroVerbose('REQUESTS_CACHE help: http://requests-cache.readthedocs.io/en/latest/')
+=======
+    warnings.warn("missing REQUESTS_CACHE module - visit https://pypi.python.org/pypi/requests-cache", ImportWarning)
+    requests_cache = None    
+else:
+    print("visit https://requests-cache.readthedocs.io/en/latest/")
+      
+>>>>>>> 623b743157e01cc3ce95ac807e3491a498b47207
     
 try:                                
     import cachecontrol#analysis:ignore
 except ImportError:  
+<<<<<<< HEAD
     CACHECONTROL_INSTALLED = False
     pyroWarning("CACHECONTROL package (visit https://pypi.python.org/pypi/requests-cache) not loaded", ImportWarning)
     try:
@@ -103,30 +119,47 @@ else:
     except ImportError:  
         pyroWarning("FASTENERS package (https://pypi.org/project/fasteners/) not loaded", ImportWarning)
     
+=======
+    warnings.warn("missing CACHECONTROL module - visit https://pypi.org/project/CacheControl/", ImportWarning)
+    cachecontrol = None
+else:
+    print("visit http://cachecontrol.readthedocs.io/en/latest/")
+
+>>>>>>> 623b743157e01cc3ce95ac807e3491a498b47207
 # Beautiful soup package
 try:                                
     import bs4
 except ImportError: 
+<<<<<<< HEAD
     BSOUP_INSTALLED = False
     pyroWarning("missing requests_cache module - visit https://pypi.python.org/pypi/beautifulsoup4", ImportWarning)
 else:
     BSOUP_INSTALLED = True
 
+=======
+    warnings.warn("missing BS4 module - visit https://pypi.python.org/pypi/beautifulsoup4", ImportWarning)
+    bs4 = None                
+   
+>>>>>>> 623b743157e01cc3ce95ac807e3491a498b47207
 try:                                
     import simplejson as json
 except ImportError:
-    warnings.warn("missing simplejson module - visit https://pypi.python.org/pypi/simplejson/", ImportWarning)
+    warnings.warn("missing SIMPLEJSON module - visit https://pypi.python.org/pypi/simplejson/", ImportWarning)
     try:                                
         import json
     except ImportError: 
-        warnings.warn("json module missing in Python Standard Library", ImportWarning)
+        warnings.warn("JSON module missing in Python Standard Library", ImportWarning)
         class json:
             def loads(arg):  return '%s' % arg
 
 try:                                
     import datetime
 except ImportError:          
+<<<<<<< HEAD
     pyroWarning("DATETIME module missing in Python Standard Library", ImportWarning)
+=======
+    warnings.warn("DATETIME module missing in Python Standard Library", ImportWarning)
+>>>>>>> 623b743157e01cc3ce95ac807e3491a498b47207
     class datetime:
         class timedelta: 
             def __init__(self,arg): return arg
@@ -134,13 +167,13 @@ except ImportError:
 try:
     import hashlib
 except ImportError:
-    warnings.warn("hashlib module missing in Python Standard Library", ImportWarning)
+    warnings.warn("HASHLIB module missing in Python Standard Library", ImportWarning)
     hashlib = None
 
 try:
     import pandas as pd
 except ImportError:          
-    warnings.warn("missing pandas module - visit https://pandas.pydata.org", ImportWarning)
+    warnings.warn("missing PANDAS module - visit https://pandas.pydata.org", ImportWarning)
     # raise IOError
     class pd:
         def read_table(*args, **kwargs): 
@@ -287,10 +320,10 @@ class Session(object):
                 cache = self.__default_cache()
             if backend.lower() == 'file':
                 try:
-                    if int(expire_after) <= 0:
-                        cache = cachecontrol.FileCache(os.path.abspath(cache), forever=True)
-                    else:
+                    if expire_after is None or int(self.expire_after) > 0:
                         cache = cachecontrol.FileCache(os.path.abspath(cache))  
+                    else:
+                        cache = cachecontrol.FileCache(os.path.abspath(cache), forever=True)
                     session = cachecontrol.CacheControl(requests.Session(), cache)
                 except:
                     session = None
@@ -428,6 +461,50 @@ class Session(object):
         return status # in requests.codes.ok ?
           
     #/************************************************************************/
+    def __get_response(self, url, **kwargs):
+        """Download URL from internet and store the downloaded content into 
+        <cache>/file.
+        If <cache>/file already exists, it returns content from disk.
+        
+            >>> page = S.__get(url, cache_store=False, force_download=False, expire_after=-1)
+        """
+        # create cache directory only the fist time it is needed
+        # note: html must be a str type not byte type
+        cache = kwargs.get('cache') or self.cache or False
+        if isinstance(cache, bool) and cache is True:
+            cache = self.__default_cache()
+        force_download = kwargs.get('force_download') or False
+        expire_after = kwargs.get('expire_after') or self.expire_after
+        # build unique filename from URL name and cache directory, _e.g._ using 
+        # hashlib encoding.
+        pathname = url.encode('utf-8')
+        try:
+            pathname = hashlib.md5(pathname).hexdigest()
+        except:
+            pathname = pathname.hex()
+        pathname = os.path.join(cache or './', pathname)
+        if force_download is True or not self.__is_cached(pathname, expire_after):
+            response = self.session.get(url)
+            content = response.content
+            if cache is not None:
+                if not os.path.exists(cache):
+                    os.makedirs(cache)
+                elif not os.path.isdir(cache):
+                    raise pyroError('cache {} is not a directory'.format(cache))
+                # write "content" to a given pathname
+                with open(pathname, 'wb') as f:
+                    f.write(content)
+                    f.close()  
+        else:
+            if not os.path.exists(cache) or not os.path.isdir(cache):
+                raise pyroError('cache %s is not a directory' % cache)
+            # read "content" from a given pathname.
+            with open(pathname, 'rb') as f:
+                content = f.read()
+                f.close()
+        return pathname, content
+
+    #/************************************************************************/
     def get_response(self, url, **kwargs):
         """
         
@@ -538,10 +615,12 @@ class Session(object):
         """
         if not os.path.exists(pathname):
             resp = False
-        elif time_out is 0:
-            resp = False
         elif time_out is None:
             resp = True
+        elif time_out < 0:
+            resp = True
+        elif time_out == 0:
+            resp = False
         else:
             cur = time.time()
             mtime = os.stat(pathname).st_mtime

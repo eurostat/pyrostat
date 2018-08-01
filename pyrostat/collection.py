@@ -137,7 +137,7 @@ class __Base(object):
             >>> session = C._set_session(**kwargs)
         """
         try:
-            self._session = self._get_session(**kwargs)
+            self._session = self.getSession(**kwargs)
         except:
             raise pyroError('wrong definition for SESSION parameter')
     @property
