@@ -6,8 +6,6 @@
 
 .. Links
 
-<<<<<<< HEAD
-=======
 .. _requests_cache: https://pypi.python.org/pypi/requests-cache
 .. |requests_cache| replace:: `requests_cache module <requests_cache_>`_
 .. _cachecontrol: https://github.com/ionrock/cachecontrol
@@ -17,9 +15,6 @@
 
 Basic class for common request operations 
 
-**About**
-
->>>>>>> 623b743157e01cc3ce95ac807e3491a498b47207
 **Description**
 
 **Usage**
@@ -41,14 +36,10 @@ Basic class for common request operations
 
 # *credits*:      `gjacopo <jacopo.grazzini@ec.europa.eu>`_ 
 # *since*:        Wed Jan  4 01:49:11 2017
-<<<<<<< HEAD
 
 __all__         = ['Session']
  
 #%%
-=======
-  
->>>>>>> 623b743157e01cc3ce95ac807e3491a498b47207
 #==============================================================================
 # IMPORT STATEMENTS
 #==============================================================================
@@ -75,24 +66,15 @@ except ImportError:
 try:                                
     import requests_cache 
 except ImportError:
-<<<<<<< HEAD
     REQUESTS_CACHE_INSTALLED = False
     pyroWarning("REQUESTS_CACHE package (https://pypi.python.org/pypi/requests-cache) not loaded", ImportWarning)
 else:
     REQUESTS_CACHE_INSTALLED = True
     pyroVerbose('REQUESTS_CACHE help: http://requests-cache.readthedocs.io/en/latest/')
-=======
-    warnings.warn("missing REQUESTS_CACHE module - visit https://pypi.python.org/pypi/requests-cache", ImportWarning)
-    requests_cache = None    
-else:
-    print("visit https://requests-cache.readthedocs.io/en/latest/")
-      
->>>>>>> 623b743157e01cc3ce95ac807e3491a498b47207
     
 try:                                
     import cachecontrol#analysis:ignore
 except ImportError:  
-<<<<<<< HEAD
     CACHECONTROL_INSTALLED = False
     pyroWarning("CACHECONTROL package (visit https://pypi.python.org/pypi/requests-cache) not loaded", ImportWarning)
     try:
@@ -119,28 +101,15 @@ else:
     except ImportError:  
         pyroWarning("FASTENERS package (https://pypi.org/project/fasteners/) not loaded", ImportWarning)
     
-=======
-    warnings.warn("missing CACHECONTROL module - visit https://pypi.org/project/CacheControl/", ImportWarning)
-    cachecontrol = None
-else:
-    print("visit http://cachecontrol.readthedocs.io/en/latest/")
-
->>>>>>> 623b743157e01cc3ce95ac807e3491a498b47207
 # Beautiful soup package
 try:                                
     import bs4
 except ImportError: 
-<<<<<<< HEAD
     BSOUP_INSTALLED = False
     pyroWarning("missing requests_cache module - visit https://pypi.python.org/pypi/beautifulsoup4", ImportWarning)
 else:
     BSOUP_INSTALLED = True
 
-=======
-    warnings.warn("missing BS4 module - visit https://pypi.python.org/pypi/beautifulsoup4", ImportWarning)
-    bs4 = None                
-   
->>>>>>> 623b743157e01cc3ce95ac807e3491a498b47207
 try:                                
     import simplejson as json
 except ImportError:
@@ -155,11 +124,7 @@ except ImportError:
 try:                                
     import datetime
 except ImportError:          
-<<<<<<< HEAD
     pyroWarning("DATETIME module missing in Python Standard Library", ImportWarning)
-=======
-    warnings.warn("DATETIME module missing in Python Standard Library", ImportWarning)
->>>>>>> 623b743157e01cc3ce95ac807e3491a498b47207
     class datetime:
         class timedelta: 
             def __init__(self,arg): return arg
