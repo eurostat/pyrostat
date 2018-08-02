@@ -342,16 +342,7 @@ class pyroError(Exception):
                  )
             )
 
-class pyroWarning(Warning):
-    """Base class for warnings in this module."""
-    def __init__(self, msg, expr=None):    
-        self.msg = msg
-        if expr is not None:    self.expr = expr
-        # logging.warning(self.msg)
-    def __repr__(self):             
-        return self.msg
-    def __str__(self):              return repr(self.msg)
-    
+#%%    
 #==============================================================================
 # LOGGER CLASS
 #==============================================================================
@@ -377,7 +368,7 @@ class pyroLogger(object):
 LOGGER = pyroLogger()
 """Logger object: where warning/info operations are defined."""
 
-        
+#%%    
 #==============================================================================
 # OBSOLETE CLASS
 #==============================================================================
@@ -398,6 +389,7 @@ class pyroObsolete(object):
     def __repr__(self):
         return self.func.__repr__()
 
+#%%    
 #==============================================================================
 # GLOBAL CLASSES/METHODS/VARIABLES
 #==============================================================================
@@ -495,20 +487,31 @@ def nest_dict(left, right, skip_none=False, sep='/'):
         >>> nest_dict({1:'a',2:'b'}, {None:'c',4:'d'}, skip_none=True)
             {1: {4: 'a/d'}, 2: {4: 'b/d'}}
     """
-    if isinstance(left, six.string_types) and isinstance(right, six.string_types):
+    if left is None or right is None:
+      if left is None and right is None:
+          if skip_none is True: 
+              return None
+          else:
+              return
+      else:
+          if skip_none is True: 
+              return None
+          else:
+              return left or right
+    elif isinstance(left, six.string_types) and isinstance(right, six.string_types):
         return  '%s%s%s' % (left, sep, right)
     elif isinstance(right, six.string_types) and isinstance(left, Mapping):
         left = left.copy()
-        for k in left.keys():
-            if skip_none is True and k is None: 
+        for k, v in left.items():
+            if skip_none is True and v is None: 
                 left.pop(k)
             else:
                 left[k] = nest_dict(left[k], right, skip_none=skip_none, sep=sep)
         return left
     elif isinstance(left, six.string_types) and isinstance(right, Mapping):
         right = right.copy()
-        for k in right.keys():
-            if skip_none is True and k is None: 
+        for k, v in right.items():
+            if skip_none is True and v is None: 
                 right.pop(k)
             else:
                 right[k] = nest_dict(left, right[k], skip_none=skip_none, sep=sep)
@@ -516,7 +519,7 @@ def nest_dict(left, right, skip_none=False, sep='/'):
     elif isinstance(left, Mapping) and isinstance(right, Mapping):
         left = left.copy()
         for k, v in left.items():
-            if skip_none is True and k is None: 
+            if skip_none is True and v is None: 
                 left.pop(k)
             elif k in right:
                 left[k] = nest_dict(v, right[k], skip_none=skip_none, sep=sep)
