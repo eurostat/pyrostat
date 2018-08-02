@@ -13,7 +13,7 @@ Basic definitions for Eurobase API
 # *since*:        Tue Jan  3 23:52:40 2017
 
 import os, sys#analysis:ignore
-import inspect
+import inspect, six
 from collections import OrderedDict, Mapping
 import logging
 
@@ -421,12 +421,17 @@ def to_key_val_list(value):
     """Take an object and test to see if it can be represented as a
     dictionary. If it can be, return a list of tuples, e.g.,
 
+    Examples
+    --------
+    
+    ::
+        
         >>> to_key_val_list([('key', 'val')])
-        [('key', 'val')]
+            [('key', 'val')]
         >>> to_key_val_list({'key': 'val'})
-        [('key', 'val')]
+            [('key', 'val')]
         >>> to_key_val_list('string')
-        ValueError: cannot encode objects that are not 2-tuples.
+            ValueError: cannot encode objects that are not 2-tuples.
     """
     if value is None:
         return None     
@@ -456,3 +461,68 @@ def merge_dict(dnew, dold, dict_class=OrderedDict):
         del merged_dict[key]
     return merged_dict
 
+def nest_dict(left, right, skip_none=False, sep='/'):
+    """
+
+    Examples
+    --------
+    
+    ::
+        
+        >>> nest_dict('a', 'b')
+            'a/b'
+        >>> nest_dict({1:'a',2:'b'}, 'c')
+            {1: 'a/c', 2: 'b/c'}
+        >>> nest_dict('a', {3:'c',4:'d'})
+            {3: 'a/c', 4: 'a/d'}
+        >>> nest_dict({1:'a',2:'b'}, {3:'c',4:'d'})
+            {1: {3: 'a/c', 4: 'a/d'}, 2: {3: 'b/c', 4: 'b/d'}}
+            
+    Note that the string separator (set by default to :data:`'/'` in the examples
+    above, can be set to any string value:
+        
+    ::
+        
+        >>> nest_dict({1:'a',2:'b'}, {3:'c',4:'d'}, sep='++')
+            {1: {3: 'a++c', 4: 'a++d'}, 2: {3: 'b++c', 4: 'b++d'}}
+            
+    Note also the usage of the :data:`skip_none` argument:
+        
+    ::
+        
+        >>> nest_dict({1:'a',2:'b'}, {None:'c',4:'d'})
+            {1: {None: 'a/c', 4: 'a/d'}, 2: {None: 'b/c', 4: 'b/d'}}
+        >>> nest_dict({1:'a',2:'b'}, {None:'c',4:'d'}, skip_none=True)
+            {1: {4: 'a/d'}, 2: {4: 'b/d'}}
+    """
+    if isinstance(left, six.string_types) and isinstance(right, six.string_types):
+        return  '%s%s%s' % (left, sep, right)
+    elif isinstance(right, six.string_types) and isinstance(left, Mapping):
+        left = left.copy()
+        for k in left.keys():
+            if skip_none is True and k is None: 
+                left.pop(k)
+            else:
+                left[k] = nest_dict(left[k], right, skip_none=skip_none, sep=sep)
+        return left
+    elif isinstance(left, six.string_types) and isinstance(right, Mapping):
+        right = right.copy()
+        for k in right.keys():
+            if skip_none is True and k is None: 
+                right.pop(k)
+            else:
+                right[k] = nest_dict(left, right[k], skip_none=skip_none, sep=sep)
+        return right
+    elif isinstance(left, Mapping) and isinstance(right, Mapping):
+        left = left.copy()
+        for k, v in left.items():
+            if skip_none is True and k is None: 
+                left.pop(k)
+            elif k in right:
+                left[k] = nest_dict(v, right[k], skip_none=skip_none, sep=sep)
+            else:
+                left[k] = {kk: nest_dict(v, right[kk], skip_none=skip_none, sep=sep) \
+                            for kk in right.keys() if kk is not None or skip_none is False}
+        return left
+    else:
+        raise IOError('parameters format not supported')
